@@ -8,7 +8,14 @@ interface RightPanelProps {
     onOpenAddFunctionModal: () => void;
     functionsList: IFunctionDef[];
     onOpenViewFunction: (fn: IFunctionDef) => void;
+
+    tempValue: number; setTempValue: (val: number) => void;
+    maxTokens: number; setMaxTokens: (val: number) => void;
+    topP: number; setTopP: (val: number) => void;
+    freqPenalty: number; setFreqPenalty: (val: number) => void;
+    presPenalty: number; setPresPenalty: (val: number) => void;
 }
+
 
 const RightPanelContainer = styled.div`
     width: 300px;
@@ -139,13 +146,14 @@ const RightPanel: React.FC<RightPanelProps> = ({
                                                    isCompareMode,
                                                    onOpenAddFunctionModal,
                                                    functionsList,
-                                                   onOpenViewFunction
+                                                   onOpenViewFunction,
+
+                                                   tempValue, setTempValue,
+                                                   maxTokens, setMaxTokens,
+                                                   topP, setTopP,
+                                                   freqPenalty, setFreqPenalty,
+                                                   presPenalty, setPresPenalty
                                                }) => {
-    const [tempValue, setTempValue] = useState(1.0);
-    const [maxTokens, setMaxTokens] = useState(2048);
-    const [topP, setTopP] = useState(1.0);
-    const [freqPenalty, setFreqPenalty] = useState(0);
-    const [presPenalty, setPresPenalty] = useState(0);
 
     return (
         <RightPanelContainer>
@@ -183,7 +191,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                         functionsList.map((fn, idx) => (
                             <FunctionItem
                                 key={idx}
-                                title="Click to view JSON"
+                                title="Click to edit function"
                                 onClick={() => onOpenViewFunction(fn)}
                             >
                                 <FiBox />
@@ -212,7 +220,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                     max={2}
                     step={0.01}
                     value={tempValue}
-                    onChange={(e) => setTempValue(parseFloat(e.target.value))}
+                    onChange={e => setTempValue(parseFloat(e.target.value))}
                     style={{ width: '100%', margin: '0.5rem 0' }}
                 />
 
@@ -226,7 +234,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                     max={32000}
                     step={1}
                     value={maxTokens}
-                    onChange={(e) => setMaxTokens(parseInt(e.target.value, 10))}
+                    onChange={e => setMaxTokens(parseInt(e.target.value, 10))}
                     style={{ width: '100%', margin: '0.5rem 0' }}
                 />
 
@@ -258,7 +266,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                     max={1}
                     step={0.01}
                     value={topP}
-                    onChange={(e) => setTopP(parseFloat(e.target.value))}
+                    onChange={e => setTopP(parseFloat(e.target.value))}
                     style={{ width: '100%', margin: '0.5rem 0' }}
                 />
 
@@ -272,7 +280,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                     max={2}
                     step={0.01}
                     value={freqPenalty}
-                    onChange={(e) => setFreqPenalty(parseFloat(e.target.value))}
+                    onChange={e => setFreqPenalty(parseFloat(e.target.value))}
                     style={{ width: '100%', margin: '0.5rem 0' }}
                 />
 
@@ -286,7 +294,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                     max={2}
                     step={0.01}
                     value={presPenalty}
-                    onChange={(e) => setPresPenalty(parseFloat(e.target.value))}
+                    onChange={e => setPresPenalty(parseFloat(e.target.value))}
                     style={{ width: '100%', margin: '0.5rem 0' }}
                 />
             </PanelSection>

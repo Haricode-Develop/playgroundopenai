@@ -22,7 +22,7 @@ interface SystemMessageCardProps {
 
 export const SystemMessageCard = styled.div<SystemMessageCardProps>`
     position: relative;
-    background-color: #2f2f2f;
+    background-color: #1f1f1f;
     margin: 1rem;
     border-radius: 8px;
     padding: 1rem;
@@ -35,55 +35,56 @@ export const SystemMessageCard = styled.div<SystemMessageCardProps>`
     ${({ $collapsed }) =>
             $collapsed
                     ? `
-        max-height: 0;
-        padding: 0 1rem;
-      `
+          max-height: 56px; 
+          padding-bottom: 0;
+        `
                     : `
-        max-height: 350px;
-      `
+          max-height: 400px;
+        `
     }
 `;
 
 export const SystemMessageHeader = styled.div`
     font-size: 0.9rem;
+    color: #fff;
+    font-weight: 500;
+`;
+
+export const SystemMessageActions = styled.div`
+    display: flex;
+    align-items: center;
+`;
+
+export const SystemMessageToggleIcon = styled.button`
+    background: none;
+    border: none;
     color: #ccc;
-    font-weight: bold;
+    cursor: pointer;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+
+    &:hover {
+        color: #fff;
+    }
 `;
 
 export const SystemMessageContent = styled.div`
     font-size: 0.9rem;
-    color: #bbb;
+    color: #eee;
     margin-top: 0.5rem;
 `;
 
-export const GenerateRectButton = styled.button`
-    background-color: #3a3a3a;
-    color: #ccc;
-    border: none;
-    border-radius: 6px;
-    padding: 0.4rem 0.8rem;
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
-    cursor: pointer;
-    transition: background 0.2s ease;
-
-    &:hover {
-        background-color: #4a4a4a;
-        color: #fff;
-    }
-`;
-
-export const CollapseButton = styled.button`
-    background: none;
-    border: none;
-    color: #999;
-    cursor: pointer;
-    font-size: 1.1rem;
-
-    &:hover {
-        color: #fff;
-    }
+export const SystemMessageTextarea = styled.textarea`
+    width: 100%;
+    background-color: #2f2f2f;
+    border: 1px solid #444;
+    color: #fff;
+    border-radius: 4px;
+    padding: 0.5rem;
+    font-size: 0.9rem;
+    resize: vertical;
+    margin-top: 0.25rem;
 `;
 
 export const MessagesContainer = styled.div`
@@ -166,7 +167,7 @@ export const RectButton = styled.button`
     align-items: center;
     gap: 0.25rem;
     cursor: pointer;
-    transition: background var(--transition-fast);
+    transition: background 0.2s ease;
 
     &:hover {
         background-color: #4a4a4a;

@@ -1,10 +1,10 @@
 import styled, { css } from 'styled-components';
 
 export const PageContainer = styled.div`
-    display: flex;
-    width: 100%;
-    height: 100vh;
-    overflow: hidden;
+  display: flex;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
 `;
 
 interface MainContentProps {
@@ -12,21 +12,21 @@ interface MainContentProps {
 }
 
 export const MainContent = styled.div<MainContentProps>`
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    background-color: #252526;
-    overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  background-color: #252526;
+  overflow: hidden;
 
-    transition: all 0.4s ease;
-    ${({ isCompareMode }) =>
-            isCompareMode
-                    ? css`
-                        /* Compare mode */
-                    `
-                    : css`
-                        /* Normal mode */
-                    `}
+  transition: all 0.4s ease;
+  ${({ isCompareMode }) =>
+    isCompareMode
+        ? css`
+          /* Compare mode */
+        `
+        : css`
+          /* Normal mode */
+        `}
 `;
 
 export const SidebarToggleButton = styled.button`

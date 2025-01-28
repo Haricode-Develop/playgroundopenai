@@ -1,8 +1,17 @@
+// src/components/modals/ViewCodeModal.tsx
+
 import React from 'react';
 import styled from 'styled-components';
+import { IMessageData } from '../chat/MessageBubble';
 
 interface Props {
     onClose: () => void;
+    messages: IMessageData[];
+    tempValue: number;
+    maxTokens: number;
+    topP: number;
+    freqPenalty: number;
+    presPenalty: number;
 }
 
 const ModalOverlay = styled.div`
@@ -24,10 +33,12 @@ const ModalContainer = styled.div`
     overflow: auto;
     max-height: 90vh;
     box-shadow: 0 4px 8px rgba(0,0,0,0.6);
+    position: relative;
 `;
 
 const Title = styled.h2`
     margin-bottom: 1rem;
+    color: #fff;
 `;
 
 const CodeBlock = styled.pre`
@@ -52,34 +63,50 @@ const Button = styled.button`
     color: #fff;
     cursor: pointer;
     border-radius: 4px;
-
     &:hover {
         background-color: #4a4a4a;
     }
 `;
 
-const ViewCodeModal: React.FC<Props> = ({ onClose }) => {
+const ViewCodeModal: React.FC<Props> = ({
+                                            onClose,
+                                            messages,
+                                            tempValue,
+                                            maxTokens,
+                                            topP,
+                                            freqPenalty,
+                                            presPenalty
+                                        }) => {
+
+    const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
+        if(e.target=== e.currentTarget){
+            onClose();
+        }
+    };
+
+    function createPayload() {
+        return {
+            model: 'gpt-4o',
+            config: {
+                temperature: tempValue,
+                max_tokens: maxTokens,
+                top_p: topP,
+                frequency_penalty: freqPenalty,
+                presence_penalty: presPenalty
+            },
+            messages: messages.map(m=>({
+                role: m.role,
+                content: m.originalContent
+            }))
+        };
+    }
+
     return (
-        <ModalOverlay>
+        <ModalOverlay onClick={handleOverlayClick}>
             <ModalContainer>
                 <Title>View code</Title>
                 <CodeBlock>
-                    {`POST /v1/completions
-
-from openai import OpenAI
-client = OpenAI()
-
-response = client.chat.completions.create(
-  model="gpt-4o",
-  messages=[
-    {"role": "system", "content": "Create a system prompt..."},
-    {"role": "user", "content": "Hi"},
-    {"role": "assistant", "content": "Hello! How can I assist you today..."},
-  ]
-)
-
-print(response)
-`}
+                    {JSON.stringify(createPayload(),null,2)}
                 </CodeBlock>
                 <ButtonsRow>
                     <Button onClick={onClose}>Close</Button>

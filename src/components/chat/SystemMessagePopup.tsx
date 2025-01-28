@@ -27,9 +27,9 @@ const PopupOverlay = styled.div<{ anchorRect: DOMRect | null }>`
         const top = anchorRect.bottom + 6;
         const left = anchorRect.left;
         return `
-      top: ${top}px;
-      left: ${left}px;
-    `;
+          top: ${top}px;
+          left: ${left}px;
+        `;
     }}
 `;
 

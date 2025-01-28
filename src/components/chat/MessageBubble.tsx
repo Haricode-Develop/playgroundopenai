@@ -1,3 +1,5 @@
+// src/components/chat/MessageBubble.tsx
+
 import React from 'react';
 import styled from 'styled-components';
 import {
@@ -19,8 +21,10 @@ export interface IMessageData {
 interface MessageBubbleProps {
     message: IMessageData;
     onDelete: (id: number) => void;
-    onToggleDislike: (id: number) => void;
+    onToggleDislike: (id: number, e?: React.MouseEvent<HTMLButtonElement>) => void;
     onToggleJSON: (id: number) => void;
+
+    // Nuevo: para abrir popup de funciones
     onOpenFunctionsPopup?: (id: number, e: React.MouseEvent<HTMLButtonElement>) => void;
 }
 
@@ -76,53 +80,47 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                                                      }) => {
     const { id, role, content, isDisliked } = message;
 
-    const renderButtons = () => {
-        if (role === 'user') {
-            // Solo botón eliminar
-            return (
-                <IconButton onClick={() => onDelete(id)} title="Delete">
-                    <FiTrash2 />
+    const renderAssistantButtons = () => {
+        return (
+            <>
+                {/* Dislike */}
+                <IconButton title="Dislike" onClick={(e) => onToggleDislike(id, e)} active={isDisliked}>
+                    <FiThumbsDown />
                 </IconButton>
-            );
-        } else {
-            // Assistant => Delete, Dislike, JSON, Functions
-            return (
-                <>
+                {/* Format JSON */}
+                <IconButton title="Format to JSON" onClick={() => onToggleJSON(id)}>
+                    <FiCode />
+                </IconButton>
+                {/* Functions */}
+                {onOpenFunctionsPopup && (
                     <IconButton
-                        title="Dislike"
-                        onClick={() => onToggleDislike(id)}
-                        active={isDisliked}
-                    >
-                        <FiThumbsDown />
-                    </IconButton>
-                    <IconButton
-                        title="Format to JSON"
-                        onClick={() => onToggleJSON(id)}
-                    >
-                        <FiCode />
-                    </IconButton>
-                    <IconButton
-                        title="Functions"
-                        onClick={(e) => onOpenFunctionsPopup && onOpenFunctionsPopup(id, e)}
+                        title="Select function"
+                        onClick={(e) => onOpenFunctionsPopup(id, e)}
                     >
                         <FiBox />
                     </IconButton>
-                    <IconButton
-                        title="Delete"
-                        onClick={() => onDelete(id)}
-                    >
-                        <FiTrash2 />
-                    </IconButton>
-                </>
-            );
-        }
+                )}
+                {/* Delete */}
+                <IconButton title="Delete" onClick={() => onDelete(id)}>
+                    <FiTrash2 />
+                </IconButton>
+            </>
+        );
     };
+
+    const renderUserButtons = () => (
+        <IconButton onClick={() => onDelete(id)} title="Delete">
+            <FiTrash2 />
+        </IconButton>
+    );
 
     return (
         <Bubble role={role}>
             <HeaderRow>
                 <RoleLabel>{role === 'assistant' ? 'Assistant' : 'User'}</RoleLabel>
-                <ActionButtons>{renderButtons()}</ActionButtons>
+                <ActionButtons>
+                    {role === 'assistant' ? renderAssistantButtons() : renderUserButtons()}
+                </ActionButtons>
             </HeaderRow>
             <ContentText>{content}</ContentText>
         </Bubble>

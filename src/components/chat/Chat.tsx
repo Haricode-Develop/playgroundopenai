@@ -1,4 +1,6 @@
-import React, { useRef, useState } from 'react';
+// src/components/chat/Chat.tsx
+
+import React, { useState } from 'react';
 import {
     ChatContainer,
     MessagesContainer,
@@ -14,98 +16,164 @@ import {
     SystemMessageCard,
     SystemMessageHeader,
     SystemMessageContent,
-    GenerateRectButton,
-    CollapseButton,
+    SystemMessageToggleIcon,
+    SystemMessageActions,
+    SystemMessageTextarea,
     FadeInMessage
 } from './chat.styles';
 
-import { FiPaperclip, FiPlus, FiSend } from 'react-icons/fi';
-import { FiZap, FiArrowUp, FiArrowDown, FiClipboard, FiChevronUp, FiChevronDown, FiStar } from 'react-icons/fi';
+import {
+    FiPaperclip,
+    FiPlus,
+    FiSend,
+    FiZap,
+    FiArrowUp,
+    FiArrowDown,
+    FiClipboard,
+    FiEdit
+} from 'react-icons/fi';
+
 import MessageBubble, { IMessageData } from './MessageBubble';
-import SystemMessagePopup from './SystemMessagePopup';
 import FunctionsPopup from './FunctionsPopup';
+import SystemGeneratePopup from './SystemGeneratePopup';
+import AttachmentsPopup from './AttachmentsPopup';
+import DislikeFeedbackPopup from './DislikeFeedbackPopup';
 import { IFunctionDef } from '../../pages/PlaygroundPage';
+
+/**
+ * Extendemos IMessageData para que un msg de 'assistant' pueda tener
+ * functionJson y functionResponse (la edición in-line de la función)
+ */
+interface IAssistantFnData {
+    functionJson?: string;       // texto JSON de la función
+    functionResponse?: string;   // texto del response
+}
+type ExtMessageData = IMessageData & IAssistantFnData;
 
 interface ChatProps {
     functionsList: IFunctionDef[];
-    onOpenViewFunction: (fn: IFunctionDef) => void;
+    messages: ExtMessageData[];
+    setMessages: React.Dispatch<React.SetStateAction<ExtMessageData[]>>;
+    onAddHistory: (m: IMessageData) => void;
 }
 
-const Chat: React.FC<ChatProps> = ({ functionsList, onOpenViewFunction }) => {
-    // System message
+const Chat: React.FC<ChatProps> = ({
+                                       functionsList,
+                                       messages,
+                                       setMessages,
+                                       onAddHistory
+                                   }) => {
+    // system message
     const [systemMessage, setSystemMessage] = useState('You are a helpful assistant...');
-    const [showSystemPopup, setShowSystemPopup] = useState(false);
     const [collapsed, setCollapsed] = useState(false);
 
-    // Mensajes
-    const [messages, setMessages] = useState<IMessageData[]>([]);
+    // input del usuario
     const [inputValue, setInputValue] = useState('');
-    const [role, setRole] = useState<'user' | 'assistant'>('user');
-    const [nextId, setNextId] = useState(1);
 
-    // Tiempos (ejemplo)
-    const timeData = {
-        totalMs: '1,001ms',
-        upTokens: '398t',
-        downTokens: '22t',
-        requestId: 'Request ID'
-    };
-
-    // Anclaje para "Generate" system message
-    const generateBtnRef = useRef<HTMLButtonElement | null>(null);
-    const [popupAnchorRect, setPopupAnchorRect] = useState<DOMRect | null>(null);
-
-    // Anclaje para popup de funciones en un mensaje assistant
+    // popups
+    const [clipAnchorRect, setClipAnchorRect] = useState<DOMRect | null>(null);
+    const [dislikeAnchorRect, setDislikeAnchorRect] = useState<DOMRect | null>(null);
+    const [dislikeMsgId, setDislikeMsgId] = useState<number | null>(null);
     const [functionsAnchorRect, setFunctionsAnchorRect] = useState<DOMRect | null>(null);
     const [currentMsgId, setCurrentMsgId] = useState<number | null>(null);
 
-    // Enviar mensaje
+    // popup generate para system message
+    const [anchorRectGenerate, setAnchorRectGenerate] = useState<DOMRect | null>(null);
+
+    // Ejemplo de times
+    const timeData = {
+        totalMs: '985ms',
+        upTokens: '692t',
+        downTokens: '31t',
+        requestId: 'Request ID'
+    };
+
+    // Al presionar "Run"
     const handleSend = () => {
-        if (!inputValue.trim()) return;
+        if (inputValue.trim()) {
+            // Mensaje de usuario
+            const userMsg: ExtMessageData = {
+                id: Date.now(),
+                role: 'user',
+                content: inputValue.trim(),
+                originalContent: inputValue.trim()
+            };
+            setMessages(prev => [...prev, userMsg]);
+            onAddHistory(userMsg);
 
-        const newMsg: IMessageData = {
-            id: nextId,
-            role,
-            content: inputValue,
-            isDisliked: false,
-            isJson: false,
-            originalContent: inputValue
-        };
+            // Mensaje de assistant (simulado)
+            const assistantMsg: ExtMessageData = {
+                id: Date.now() + 1,
+                role: 'assistant',
+                content: `Assistant response to: "${inputValue.trim()}"`,
+                originalContent: `Assistant response to: "${inputValue.trim()}"`
+            };
+            // Chequeamos si hay algún assistant con function data
+            const hasFn = messages.find(m =>
+                m.role === 'assistant' && m.functionJson && m.functionResponse
+            );
+            if (hasFn) {
+                assistantMsg.content += `\n\n(Using function data: ${hasFn.functionJson}, response: ${hasFn.functionResponse})`;
+                assistantMsg.originalContent = assistantMsg.content;
+            }
+            setMessages(prev => [...prev, assistantMsg]);
+            onAddHistory(assistantMsg);
 
-        setMessages((prev) => [...prev, newMsg]);
-        setNextId(nextId + 1);
-        setInputValue('');
+            setInputValue('');
+        } else {
+            // Si no hay texto => tomamos systemMessage
+            const systemMsg: ExtMessageData = {
+                id: Date.now(),
+                role: 'assistant',
+                content: systemMessage.trim() || '(System empty)',
+                originalContent: systemMessage.trim()
+            };
+            const hasFn = messages.find(m =>
+                m.role==='assistant' && m.functionJson && m.functionResponse
+            );
+            if(hasFn) {
+                systemMsg.content += `\n\n(Using function data: ${hasFn.functionJson}, response: ${hasFn.functionResponse})`;
+                systemMsg.originalContent = systemMsg.content;
+            }
+            setMessages(prev => [...prev, systemMsg]);
+            onAddHistory(systemMsg);
+        }
     };
 
-    // Cambiar role
-    const toggleRole = () => {
-        setRole((prev) => (prev === 'user' ? 'assistant' : 'user'));
-    };
-
-    // Borrar mensaje
+    // Borrar un mensaje
     const handleDeleteMessage = (id: number) => {
-        setMessages((prev) => prev.filter((m) => m.id !== id));
+        setMessages(prev => prev.filter(m => m.id !== id));
     };
 
-    // Dislike
-    const handleToggleDislike = (id: number) => {
-        setMessages((prev) =>
-            prev.map((m) => (m.id === id ? { ...m, isDisliked: !m.isDisliked } : m))
-        );
+    // Dislike => popup
+    const handleToggleDislike = (id: number, e?: React.MouseEvent<HTMLButtonElement>) => {
+        if (!e) {
+            // si no hay evento, togglear normal
+            setMessages(prev =>
+                prev.map(m => (m.id === id ? { ...m, isDisliked: !m.isDisliked } : m))
+            );
+            return;
+        }
+        const rect = e.currentTarget.getBoundingClientRect();
+        setDislikeAnchorRect(rect);
+        setDislikeMsgId(id);
+    };
+    const closeDislikePopup = () => {
+        setDislikeAnchorRect(null);
+        setDislikeMsgId(null);
     };
 
     // Convertir a JSON
     const handleToggleJSON = (id: number) => {
-        setMessages((prev) =>
-            prev.map((m) => {
+        setMessages(prev =>
+            prev.map(m => {
                 if (m.id === id) {
                     if (!m.isJson) {
-                        const jsonString = JSON.stringify(
+                        const j = JSON.stringify(
                             { role: m.role, content: m.originalContent },
-                            null,
-                            2
+                            null, 2
                         );
-                        return { ...m, content: jsonString, isJson: true };
+                        return { ...m, content: j, isJson: true };
                     } else {
                         return { ...m, content: m.originalContent || '', isJson: false };
                     }
@@ -115,98 +183,122 @@ const Chat: React.FC<ChatProps> = ({ functionsList, onOpenViewFunction }) => {
         );
     };
 
-    // Crear system message
-    const handleCreateSystemMessage = (text: string) => {
-        setSystemMessage(text);
-        setShowSystemPopup(false);
-        setPopupAnchorRect(null);
-
-        // Agrega un mensaje "assistant" con ese contenido
-        const newMsg: IMessageData = {
-            id: nextId,
-            role: 'assistant',
-            content: text,
-            isDisliked: false,
-            isJson: false,
-            originalContent: text
-        };
-        setMessages((prev) => [...prev, newMsg]);
-        setNextId(nextId + 1);
-    };
-
-    // Abrir popup system
-    const openSystemPopup = () => {
-        if (generateBtnRef.current) {
-            const rect = generateBtnRef.current.getBoundingClientRect();
-            setPopupAnchorRect(rect);
-            setShowSystemPopup(true);
-        }
-    };
-
-    // Abrir popup de funciones
+    // Popup de Functions
     const handleOpenFunctionsPopup = (msgId: number, e: React.MouseEvent<HTMLButtonElement>) => {
+        setCurrentMsgId(msgId);
         const rect = e.currentTarget.getBoundingClientRect();
         setFunctionsAnchorRect(rect);
-        setCurrentMsgId(msgId);
     };
-
-    // Seleccionar una función => reemplazar contenido
-    const handleSelectFunction = (fn: IFunctionDef) => {
-        if (currentMsgId == null) return;
-        setMessages((prev) =>
-            prev.map((m) => {
-                if (m.id === currentMsgId) {
-                    // Insertar la función al final
-                    const newContent = `${m.content}\n\n${fn.name}({})`;
-                    return { ...m, content: newContent };
-                }
-                return m;
-            })
-        );
-        closeFunctionsPopup();
-    };
-
     const closeFunctionsPopup = () => {
         setFunctionsAnchorRect(null);
         setCurrentMsgId(null);
+    };
+
+    // Cuando el usuario selecciona una function
+    const handleSelectFunction = (fn: IFunctionDef) => {
+        if (!currentMsgId) return;
+        setMessages(prev => prev.map(m => {
+            if (m.id === currentMsgId) {
+                return {
+                    ...m,
+                    functionJson: fn.jsonDefinition,
+                    functionResponse: ''
+                };
+            }
+            return m;
+        }));
+        closeFunctionsPopup();
+    };
+
+    // System generate
+    const handleGenerateClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        setAnchorRectGenerate(rect);
+    };
+    const handleCloseGeneratePopup = () => {
+        setAnchorRectGenerate(null);
+    };
+    const handleSubmitGeneratePopup = (newText: string) => {
+        setSystemMessage(newText);
+        setAnchorRectGenerate(null);
+    };
+
+    // Clip
+    const handleClipClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        setClipAnchorRect({ ...rect, top: rect.top - 120 });
+    };
+    const closeClipPopup = () => setClipAnchorRect(null);
+
+    // Editar la function in-line
+    const handleChangeFnJson = (id: number, newText: string) => {
+        setMessages(prev => prev.map(m => {
+            if (m.id === id) {
+                return { ...m, functionJson: newText };
+            }
+            return m;
+        }));
+    };
+    const handleChangeFnResp = (id: number, newText: string) => {
+        setMessages(prev => prev.map(m => {
+            if (m.id === id) {
+                return { ...m, functionResponse: newText };
+            }
+            return m;
+        }));
     };
 
     return (
         <ChatContainer>
             {/* System message */}
             <SystemMessageCard $collapsed={collapsed}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                     <SystemMessageHeader>System message</SystemMessageHeader>
-                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                        <GenerateRectButton ref={generateBtnRef} onClick={openSystemPopup}>
-                            <FiStar />
-                            Generate
-                        </GenerateRectButton>
-                        <CollapseButton onClick={() => setCollapsed(!collapsed)}>
-                            {collapsed ? <FiChevronDown /> : <FiChevronUp />}
-                        </CollapseButton>
-                    </div>
+                    <SystemMessageActions>
+                        {!collapsed && (
+                            <button
+                                style={{
+                                    background:'#00a37a',
+                                    border:'none',
+                                    color:'#fff',
+                                    cursor:'pointer',
+                                    borderRadius:'4px',
+                                    padding:'0.3rem 0.5rem',
+                                    marginRight:'0.75rem'
+                                }}
+                                onClick={handleGenerateClick}
+                            >
+                                Generate
+                            </button>
+                        )}
+                        <SystemMessageToggleIcon onClick={() => setCollapsed(!collapsed)}>
+                            {collapsed ? <FiEdit /> : <FiArrowUp />}
+                        </SystemMessageToggleIcon>
+                    </SystemMessageActions>
                 </div>
                 {!collapsed && (
-                    <SystemMessageContent>{systemMessage}</SystemMessageContent>
+                    <SystemMessageContent>
+                        <SystemMessageTextarea
+                            placeholder="Describe instructions..."
+                            value={systemMessage}
+                            onChange={e => setSystemMessage(e.target.value)}
+                        />
+                    </SystemMessageContent>
                 )}
             </SystemMessageCard>
 
-            {showSystemPopup && popupAnchorRect && (
-                <SystemMessagePopup
-                    initialText={systemMessage}
-                    onClose={() => {
-                        setShowSystemPopup(false);
-                        setPopupAnchorRect(null);
-                    }}
-                    onCreate={handleCreateSystemMessage}
-                    anchorRect={popupAnchorRect}
+            {anchorRectGenerate && (
+                <SystemGeneratePopup
+                    anchorRect={anchorRectGenerate}
+                    currentValue={systemMessage}
+                    onClose={handleCloseGeneratePopup}
+                    onSubmit={handleSubmitGeneratePopup}
                 />
             )}
 
             {/* Lista de mensajes */}
             <MessagesContainer>
-                {messages.map((msg) => (
+                {messages.map(msg => (
                     <FadeInMessage key={msg.id}>
                         <MessageBubble
                             message={msg}
@@ -215,6 +307,54 @@ const Chat: React.FC<ChatProps> = ({ functionsList, onOpenViewFunction }) => {
                             onToggleJSON={handleToggleJSON}
                             onOpenFunctionsPopup={handleOpenFunctionsPopup}
                         />
+
+                        {/* Si es assistant y tiene functionJson => mostramos 2 textareas */}
+                        {msg.role === 'assistant' && msg.functionJson !== undefined && (
+                            <div
+                                style={{
+                                    background:'#333',
+                                    margin:'0.3rem 0 1rem 2rem',
+                                    borderRadius:'8px',
+                                    padding:'0.5rem'
+                                }}
+                            >
+                                <div style={{ color:'#aaa', fontSize:'0.85rem', marginBottom:'0.3rem' }}>
+                                    Function: (edit parameters)
+                                </div>
+                                <textarea
+                                    style={{
+                                        width:'100%',
+                                        background:'#1f1f1f',
+                                        border:'1px solid #444',
+                                        borderRadius:'4px',
+                                        color:'#fff',
+                                        padding:'0.5rem',
+                                        marginBottom:'0.5rem'
+                                    }}
+                                    rows={6}
+                                    value={msg.functionJson}
+                                    onChange={e => handleChangeFnJson(msg.id, e.target.value)}
+                                />
+
+                                <div style={{ color:'#aaa', fontSize:'0.85rem', marginBottom:'0.3rem' }}>
+                                    RESPONSE
+                                </div>
+                                <textarea
+                                    style={{
+                                        width:'100%',
+                                        background:'#1f1f1f',
+                                        border:'1px solid #444',
+                                        borderRadius:'4px',
+                                        color:'#fff',
+                                        padding:'0.5rem'
+                                    }}
+                                    rows={3}
+                                    placeholder='Press tab to generate a response or enter one manually e.g. { "success": true }'
+                                    value={msg.functionResponse || ''}
+                                    onChange={e => handleChangeFnResp(msg.id, e.target.value)}
+                                />
+                            </div>
+                        )}
                     </FadeInMessage>
                 ))}
             </MessagesContainer>
@@ -225,7 +365,21 @@ const Chat: React.FC<ChatProps> = ({ functionsList, onOpenViewFunction }) => {
                     anchorRect={functionsAnchorRect}
                     functionsList={functionsList}
                     onSelectFunction={handleSelectFunction}
-                    onClose={closeFunctionsPopup}
+                    onClose={() => {
+                        setFunctionsAnchorRect(null);
+                        setCurrentMsgId(null);
+                    }}
+                />
+            )}
+
+            {/* Popup de dislike */}
+            {dislikeAnchorRect && dislikeMsgId && (
+                <DislikeFeedbackPopup
+                    anchorRect={dislikeAnchorRect}
+                    onClose={() => {
+                        setDislikeAnchorRect(null);
+                        setDislikeMsgId(null);
+                    }}
                 />
             )}
 
@@ -254,20 +408,20 @@ const Chat: React.FC<ChatProps> = ({ functionsList, onOpenViewFunction }) => {
                 <ChatTextArea
                     placeholder="Type your message..."
                     value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
+                    onChange={e => setInputValue(e.target.value)}
                 />
-
                 <BottomControls>
                     <LeftButtonsGroup>
-                        <RectButton>
+                        <RectButton onClick={handleClipClick}>
                             <FiPaperclip />
-                            File
                         </RectButton>
-                        <RectButton onClick={toggleRole}>
-                            {role === 'user' ? 'User' : 'Asst'}
-                        </RectButton>
+                        {clipAnchorRect && (
+                            <AttachmentsPopup
+                                anchorRect={clipAnchorRect}
+                                onClose={closeClipPopup}
+                            />
+                        )}
                     </LeftButtonsGroup>
-
                     <RightButtonsGroup>
                         <RectButton>
                             <FiPlus />

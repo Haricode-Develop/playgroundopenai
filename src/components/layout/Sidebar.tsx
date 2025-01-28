@@ -22,7 +22,6 @@ const SidebarContainer = styled.div<{ isOpen: boolean }>`
     position: relative;
     display: flex;
     flex-direction: column;
-
     width: ${({ isOpen }) => (isOpen ? '200px' : '0px')};
     transition: width 0.3s ease;
     overflow: hidden;

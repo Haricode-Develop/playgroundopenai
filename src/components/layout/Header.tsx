@@ -1,3 +1,5 @@
+// src/components/layout/Header.tsx
+
 import React from 'react';
 import styled from 'styled-components';
 import {
@@ -27,50 +29,49 @@ const HeaderButton = styled.button`
     cursor: pointer;
     font-size: 0.9rem;
     border-radius: 4px;
-    transition: background var(--transition-fast);
-
+    transition: background 0.2s;
     &:hover {
         background-color: #3a3a3a;
         color: #fff;
     }
-
     svg {
         font-size: 1rem;
     }
 `;
 
-interface HeaderProps {
+export interface HeaderProps {
     onClickViewCode: () => void;
     onToggleCompare: () => void;
     onClear: () => void;
+    onToggleHistory?: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
                                            onClickViewCode,
                                            onToggleCompare,
-                                           onClear
+                                           onClear,
+                                           onToggleHistory
                                        }) => {
     return (
         <HeaderContainer>
             <HeaderButton onClick={onClear}>
-                <FiTrash2 />
+                <FiTrash2/>
                 Clear
             </HeaderButton>
-
             <HeaderButton onClick={onClickViewCode}>
-                <FiCode />
+                <FiCode/>
                 Code
             </HeaderButton>
-
             <HeaderButton onClick={onToggleCompare}>
-                <FiGitBranch />
+                <FiGitBranch/>
                 Compare
             </HeaderButton>
-
-            <HeaderButton>
-                <FiClock />
-                History
-            </HeaderButton>
+            {onToggleHistory && (
+                <HeaderButton onClick={onToggleHistory}>
+                    <FiClock/>
+                    History
+                </HeaderButton>
+            )}
         </HeaderContainer>
     );
 };
