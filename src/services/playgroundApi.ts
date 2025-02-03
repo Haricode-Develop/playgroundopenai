@@ -1,7 +1,9 @@
 // src/services/playgroundApi.ts
 
-const OPENAI_API_KEY = "#";
-const BASE_URL = "https://api.openai.com/v1";
+const OPENAI_API_KEY = process.env.REACT_APP_OPENAI_API_KEY;
+if (!OPENAI_API_KEY) {
+    throw new Error("La variable de entorno OPENAI_API_KEY no está definida.");
+}const BASE_URL = "https://api.openai.com/v1";
 
 /**
  * Inyecta manualmente TTS/Whisper/DALL-E si no existen ya en la lista,
