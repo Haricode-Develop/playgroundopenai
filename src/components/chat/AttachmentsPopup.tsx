@@ -1,9 +1,13 @@
+// src/components/chat/AttachmentsPopup.tsx
+
 import React, { useEffect } from 'react';
 import styled from 'styled-components';
 
 interface Props {
     anchorRect: DOMRect | null;
     onClose: () => void;
+    onLinkImage: () => void;
+    onUploadImage: () => void;
 }
 
 const PopupContainer = styled.div<{ anchorRect: DOMRect | null }>`
@@ -47,15 +51,25 @@ const Disabled = styled.div`
     cursor: not-allowed;
 `;
 
-const AttachmentsPopup: React.FC<Props> = ({ anchorRect, onClose }) => {
+const AttachmentsPopup: React.FC<Props> = ({ anchorRect, onClose, onLinkImage, onUploadImage }) => {
     useEffect(() => {
         if (!anchorRect) onClose();
     }, [anchorRect, onClose]);
 
+    const handleLink = () => {
+        onLinkImage();
+        onClose();
+    };
+
+    const handleUpload = () => {
+        onUploadImage();
+        onClose();
+    };
+
     return (
         <PopupContainer anchorRect={anchorRect}>
-            <Item>Link to image</Item>
-            <Item>Upload image</Item>
+            <Item onClick={handleLink}>Link to image</Item>
+            <Item onClick={handleUpload}>Upload image</Item>
             <Disabled>Upload audio <br/><small>gpt-4o does not support audio attachments</small></Disabled>
         </PopupContainer>
     );

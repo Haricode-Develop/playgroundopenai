@@ -9,79 +9,75 @@ interface Props {
 }
 
 const PopupContainer = styled.div<{ anchorRect: DOMRect | null }>`
-  position: absolute;
-  background-color: #1f1f1f;
-  border: 1px solid #444;
-  border-radius: 6px;
-  padding: 1rem;
-  z-index: 9999;
-  width: 300px;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+    position: absolute;
+    background-color: #1f1f1f;
+    border: 1px solid #444;
+    border-radius: 6px;
+    padding: 1rem;
+    z-index: 9999;
+    width: 300px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.5);
 
-  ${({ anchorRect }) => {
-    if (!anchorRect) return '';
-    // Ponemos un offset para que salga arriba
-    const top = anchorRect.top - 140;
-    const left = anchorRect.left;
-    return `
+    ${({ anchorRect }) => {
+        if (!anchorRect) return '';
+        const top = anchorRect.top - 140;
+        const left = anchorRect.left;
+        return `
       top: ${top}px;
       left: ${left}px;
     `;
-}}
+    }}
 `;
 
 const Title = styled.h3`
-  margin: 0;
-  font-size: 1rem;
-  color: #fff;
-  margin-bottom: 0.5rem;
+    margin: 0;
+    font-size: 1rem;
+    color: #fff;
+    margin-bottom: 0.5rem;
 `;
 
 const Info = styled.div`
-  font-size: 0.85rem;
-  color: #bbb;
-  margin-bottom: 0.5rem;
-  line-height: 1.3;
+    font-size: 0.85rem;
+    color: #bbb;
+    margin-bottom: 0.5rem;
+    line-height: 1.3;
 `;
 
 const ButtonRow = styled.div`
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
 `;
 
 const Button = styled.button<{ $primary?: boolean }>`
-  background-color: ${({ $primary }) => ($primary ? '#00a37a' : '#3a3a3a')};
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  padding: 0.4rem 0.75rem;
-  cursor: pointer;
+    background-color: ${({ $primary }) => ($primary ? '#00a37a' : '#3a3a3a')};
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 0.4rem 0.75rem;
+    cursor: pointer;
 
-  &:hover {
-    background-color: ${({ $primary }) => ($primary ? '#00b88c' : '#555')};
-  }
+    &:hover {
+        background-color: ${({ $primary }) => ($primary ? '#00b88c' : '#555')};
+    }
 `;
 
-/** Textarea para la 2da etapa */
 const FeedbackText = styled.textarea`
-  width: 100%;
-  background-color: #2a2a2a;
-  border: 1px solid #555;
-  border-radius: 4px;
-  color: #fff;
-  padding: 0.5rem;
-  resize: vertical;
-  margin-top: 0.5rem;
+    width: 100%;
+    background-color: #2a2a2a;
+    border: 1px solid #555;
+    border-radius: 4px;
+    color: #fff;
+    padding: 0.5rem;
+    resize: vertical;
+    margin-top: 0.5rem;
 `;
 
 const DislikeFeedbackPopup: React.FC<Props> = ({
                                                    anchorRect,
                                                    onClose
                                                }) => {
-    // stage=0 => “Allow feedback?”
-    // stage=1 => text box + “Send”
     const [stage, setStage] = useState(0);
     const [feedback, setFeedback] = useState('');
 
@@ -117,7 +113,6 @@ const DislikeFeedbackPopup: React.FC<Props> = ({
         );
     }
 
-    // stage=1 => Text area
     return (
         <PopupContainer anchorRect={anchorRect}>
             <Info>Tell us what was wrong or how the response could be improved.</Info>

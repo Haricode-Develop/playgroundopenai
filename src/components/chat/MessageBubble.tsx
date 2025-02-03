@@ -9,26 +9,26 @@ import {
     FiBox
 } from 'react-icons/fi';
 
+export type ChatRole = 'function' | 'assistant' | 'system' | 'user';
+
 export interface IMessageData {
     id: number;
-    role: 'user' | 'assistant';
+    role: ChatRole;
     content: string;
+    originalContent?: string;
     isDisliked?: boolean;
     isJson?: boolean;
-    originalContent?: string;
 }
-
 interface MessageBubbleProps {
     message: IMessageData;
     onDelete: (id: number) => void;
     onToggleDislike: (id: number, e?: React.MouseEvent<HTMLButtonElement>) => void;
     onToggleJSON: (id: number) => void;
 
-    // Nuevo: para abrir popup de funciones
     onOpenFunctionsPopup?: (id: number, e: React.MouseEvent<HTMLButtonElement>) => void;
 }
 
-const Bubble = styled.div<{ role: 'user' | 'assistant' }>`
+const Bubble = styled.div<{ role: 'user' | 'assistant' | 'system' | 'function' }>`
     background-color: ${({ role }) => (role === 'user' ? '#3a3a3a' : '#2f2f2f')};
     padding: 0.75rem;
     margin: 0.5rem 0;
@@ -83,15 +83,19 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     const renderAssistantButtons = () => {
         return (
             <>
-                {/* Dislike */}
-                <IconButton title="Dislike" onClick={(e) => onToggleDislike(id, e)} active={isDisliked}>
+                <IconButton
+                    title="Dislike"
+                    onClick={(e) => onToggleDislike(id, e)}
+                    active={isDisliked}
+                >
                     <FiThumbsDown />
                 </IconButton>
-                {/* Format JSON */}
-                <IconButton title="Format to JSON" onClick={() => onToggleJSON(id)}>
+                <IconButton
+                    title="Format to JSON"
+                    onClick={() => onToggleJSON(id)}
+                >
                     <FiCode />
                 </IconButton>
-                {/* Functions */}
                 {onOpenFunctionsPopup && (
                     <IconButton
                         title="Select function"
@@ -100,7 +104,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                         <FiBox />
                     </IconButton>
                 )}
-                {/* Delete */}
                 <IconButton title="Delete" onClick={() => onDelete(id)}>
                     <FiTrash2 />
                 </IconButton>
@@ -117,7 +120,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     return (
         <Bubble role={role}>
             <HeaderRow>
-                <RoleLabel>{role === 'assistant' ? 'Assistant' : 'User'}</RoleLabel>
+                <RoleLabel>
+                    {role === 'assistant' ? 'Assistant' : 'User'}
+                </RoleLabel>
                 <ActionButtons>
                     {role === 'assistant' ? renderAssistantButtons() : renderUserButtons()}
                 </ActionButtons>

@@ -4,7 +4,6 @@ import React, { useRef } from 'react';
 import styled from 'styled-components';
 import { FiDownload, FiTrash2, FiX } from 'react-icons/fi';
 
-// Interfaz local (ajusta según tu uso)
 interface IHistoryItem {
     id: number;
     role: 'user' | 'assistant';
@@ -118,9 +117,7 @@ interface HistoryProps {
     onClearHistory: () => void;
     onDownloadHistory: () => void;
 
-    // El array COMPLETO de mensajes del chat principal
     fullMessages: any[];
-    // Para sobrescribir los mensajes cuando se hace hover en un item
     setFilteredMessages: React.Dispatch<React.SetStateAction<any[]>>;
 }
 
@@ -132,19 +129,15 @@ const HistoryPanel: React.FC<HistoryProps> = ({
                                                   fullMessages,
                                                   setFilteredMessages
                                               }) => {
-
-    // Usamos un ref para asegurar que siempre almacenamos/recuperamos la versión correcta
     const originalRef = useRef<any[] | null>(null);
 
     const groupedByDate = groupHistoryByDate(historyRecords);
 
-    // Mostrar SOLO el item hovered
     const handleMouseEnter = (item: IHistoryItem) => {
-        // Guardamos SIEMPRE la versión más reciente de la conversación
         originalRef.current = [...fullMessages];
 
         setFilteredMessages([{
-            id: Date.now(), // ID único
+            id: Date.now(),
             role: item.role,
             content: item.content,
             isDisliked: false,
@@ -153,9 +146,7 @@ const HistoryPanel: React.FC<HistoryProps> = ({
         }]);
     };
 
-    // Restablecer TODOS los mensajes al quitar hover
     const handleMouseLeave = () => {
-        // Si por alguna razón no tenemos nada guardado, no hacemos nada
         if (originalRef.current) {
             setFilteredMessages(originalRef.current);
             originalRef.current = null;
@@ -211,7 +202,7 @@ const HistoryPanel: React.FC<HistoryProps> = ({
     );
 };
 
-// Funciones auxiliares
+// Auxiliares
 
 function groupHistoryByDate(records: IHistoryItem[]) {
     const map: Record<string, IHistoryItem[]> = {};

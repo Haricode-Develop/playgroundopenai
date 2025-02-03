@@ -15,15 +15,18 @@ interface Props {
     side: 'left' | 'right';
     onClose: () => void;
 
-    // states
-    model: string; setModel: (m:string)=>void;
-    responseFormat: string; setResponseFormat: (f:string)=>void;
-    functionsList: IFunctionDef[]; setFunctionsList: (fn:IFunctionDef[])=>void;
-    temp: number; setTemp: (n:number)=>void;
-    maxTokens: number; setMaxTokens: (n:number)=>void;
-    topP: number; setTopP: (n:number)=>void;
-    freqPenalty: number; setFreqPenalty: (n:number)=>void;
-    presPenalty: number; setPresPenalty: (n:number)=>void;
+    models: { id: string }[];
+    loadingModels: boolean;
+    errorModels: string | null;
+
+    model: string; setModel: (m: string) => void;
+    responseFormat: string; setResponseFormat: (f: string) => void;
+    functionsList: IFunctionDef[]; setFunctionsList: (fn: IFunctionDef[]) => void;
+    temp: number; setTemp: (n: number) => void;
+    maxTokens: number; setMaxTokens: (n: number) => void;
+    topP: number; setTopP: (n: number) => void;
+    freqPenalty: number; setFreqPenalty: (n: number) => void;
+    presPenalty: number; setPresPenalty: (n: number) => void;
 }
 
 const Overlay = styled.div`
@@ -85,6 +88,7 @@ const FnItem = styled.div`
     gap: 0.4rem;
     margin-top: 0.3rem;
     cursor: pointer;
+
     &:hover {
         background: #3a3a3a;
     }
@@ -101,6 +105,7 @@ const AddBtn = styled.button`
     align-items: center;
     gap: 0.25rem;
     cursor: pointer;
+
     &:hover { background-color: #4a4a4a; }
 `;
 
@@ -132,6 +137,7 @@ const CloseBtn = styled.button`
     border-radius: 6px;
     padding: 0.4rem 0.8rem;
     cursor: pointer;
+
     &:hover {
         background-color: #4a4a4a;
     }
@@ -141,6 +147,10 @@ const CompareColumnConfig: React.FC<Props> = ({
                                                   anchorRect,
                                                   side,
                                                   onClose,
+
+                                                  models,
+                                                  loadingModels,
+                                                  errorModels,
 
                                                   model, setModel,
                                                   responseFormat, setResponseFormat,
@@ -156,29 +166,29 @@ const CompareColumnConfig: React.FC<Props> = ({
 
     const [showAddFn, setShowAddFn] = useState(false);
 
-    useEffect(()=>{
-        function handleDocClick(e: MouseEvent){
-            if(!containerRef.current) return;
-            if(!overlayRef.current) return;
-            if(!containerRef.current.contains(e.target as Node)){
-                // Revisar si el AddFunctionModal se está abriendo
+    useEffect(() => {
+        function handleDocClick(e: MouseEvent) {
+            if (!containerRef.current) return;
+            if (!overlayRef.current) return;
+            if (!containerRef.current.contains(e.target as Node)) {
+                // Verificamos si no fue click dentro del modal "AddFunctionModal"
                 const modals = document.querySelectorAll('.addFnModalOverlay');
                 let clickedInModal = false;
                 modals.forEach(m => {
-                    if(m.contains(e.target as Node)) {
+                    if (m.contains(e.target as Node)) {
                         clickedInModal = true;
                     }
                 });
-                if(!clickedInModal){
+                if (!clickedInModal) {
                     onClose();
                 }
             }
         }
         document.addEventListener('mousedown', handleDocClick);
-        return ()=> {
+        return () => {
             document.removeEventListener('mousedown', handleDocClick);
         };
-    },[onClose]);
+    }, [onClose]);
 
     const top = anchorRect.bottom + 5;
     const left = anchorRect.left - 280;
@@ -191,22 +201,40 @@ const CompareColumnConfig: React.FC<Props> = ({
         <Overlay ref={overlayRef}>
             <Container ref={containerRef} style={{ position:'absolute', top, left }}>
                 <Header>{side} config</Header>
+
                 <Section>
                     <Label>Model</Label>
-                    <Select value={model} onChange={e=> setModel(e.target.value)}>
-                        <option>gpt-4o</option>
-                        <option>gpt-4o-mini</option>
-                        <option>01-preview-2024-09-12</option>
-                    </Select>
+                    {loadingModels && <div style={{ color: '#aaa' }}>Loading models...</div>}
+                    {errorModels && <div style={{ color: 'red' }}>{errorModels}</div>}
+                    {!loadingModels && !errorModels && models.length > 0 && (
+                        <Select
+                            value={model}
+                            onChange={e => setModel(e.target.value)}
+                        >
+                            {models.map((m) => (
+                                <option key={m.id} value={m.id}>{m.id}</option>
+                            ))}
+                        </Select>
+                    )}
+                    {models.length === 0 && !loadingModels && !errorModels && (
+                        <Select disabled>
+                            <option>No models</option>
+                        </Select>
+                    )}
                 </Section>
+
                 <Section>
                     <Label>Response format</Label>
-                    <Select value={responseFormat} onChange={e=> setResponseFormat(e.target.value)}>
+                    <Select
+                        value={responseFormat}
+                        onChange={e => setResponseFormat(e.target.value)}
+                    >
                         <option>text</option>
                         <option>json</option>
                         <option>json_object</option>
                     </Select>
                 </Section>
+
                 <Section>
                     <Label>Functions</Label>
                     <FnList>
@@ -222,6 +250,7 @@ const CompareColumnConfig: React.FC<Props> = ({
                         <FiPlus/> Add
                     </AddBtn>
                 </Section>
+
                 <Section>
                     <Label>Model configuration</Label>
                     <RangeRow>
@@ -236,6 +265,7 @@ const CompareColumnConfig: React.FC<Props> = ({
                         value={temp}
                         onChange={e=> setTemp(parseFloat(e.target.value))}
                     />
+
                     <RangeRow>
                         <label>Max tokens</label>
                         <span>{maxTokens}</span>
@@ -248,6 +278,7 @@ const CompareColumnConfig: React.FC<Props> = ({
                         value={maxTokens}
                         onChange={e=> setMaxTokens(parseInt(e.target.value))}
                     />
+
                     <div style={{marginBottom:'1rem'}}>
                         <label style={{color:'#fff'}}>Stop sequences</label>
                         <input
@@ -264,6 +295,7 @@ const CompareColumnConfig: React.FC<Props> = ({
                         />
                         <small style={{color:'#666'}}>Enter sequence and press Tab</small>
                     </div>
+
                     <RangeRow>
                         <label>Top P</label>
                         <span>{topP.toFixed(2)}</span>
@@ -276,6 +308,7 @@ const CompareColumnConfig: React.FC<Props> = ({
                         value={topP}
                         onChange={e=> setTopP(parseFloat(e.target.value))}
                     />
+
                     <RangeRow>
                         <label>Frequency penalty</label>
                         <span>{freqPenalty.toFixed(2)}</span>
@@ -288,6 +321,7 @@ const CompareColumnConfig: React.FC<Props> = ({
                         value={freqPenalty}
                         onChange={e=> setFreqPenalty(parseFloat(e.target.value))}
                     />
+
                     <RangeRow>
                         <label>Presence penalty</label>
                         <span>{presPenalty.toFixed(2)}</span>
@@ -301,6 +335,7 @@ const CompareColumnConfig: React.FC<Props> = ({
                         onChange={e=> setPresPenalty(parseFloat(e.target.value))}
                     />
                 </Section>
+
                 <Footer>
                     <CloseBtn onClick={onClose}>Close</CloseBtn>
                 </Footer>

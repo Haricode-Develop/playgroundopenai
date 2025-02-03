@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+// src/components/layout/RightPanel.tsx
+
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { FiBox, FiPlus } from 'react-icons/fi';
 import { IFunctionDef } from '../../pages/PlaygroundPage';
+import { listModels } from '../../services/playgroundApi';
 
 interface RightPanelProps {
     isCompareMode: boolean;
@@ -9,13 +12,17 @@ interface RightPanelProps {
     functionsList: IFunctionDef[];
     onOpenViewFunction: (fn: IFunctionDef) => void;
 
+    // Aquí agregamos:
+    selectedModel: string;
+    setSelectedModel: (val: string) => void;
+
+    // Parámetros de config
     tempValue: number; setTempValue: (val: number) => void;
     maxTokens: number; setMaxTokens: (val: number) => void;
     topP: number; setTopP: (val: number) => void;
     freqPenalty: number; setFreqPenalty: (val: number) => void;
     presPenalty: number; setPresPenalty: (val: number) => void;
 }
-
 
 const RightPanelContainer = styled.div`
     width: 300px;
@@ -87,6 +94,7 @@ const FunctionItem = styled.div`
     display: flex;
     align-items: center;
     gap: 0.4rem;
+
     &:hover {
         background-color: #3a3a3a;
     }
@@ -148,12 +156,35 @@ const RightPanel: React.FC<RightPanelProps> = ({
                                                    functionsList,
                                                    onOpenViewFunction,
 
+                                                   selectedModel,
+                                                   setSelectedModel,
+
                                                    tempValue, setTempValue,
                                                    maxTokens, setMaxTokens,
                                                    topP, setTopP,
                                                    freqPenalty, setFreqPenalty,
                                                    presPenalty, setPresPenalty
                                                }) => {
+    const [modelList, setModelList] = useState<{id: string}[]>([]);
+    const [loadingModels, setLoadingModels] = useState(false);
+    const [errorModels, setErrorModels] = useState<string | null>(null);
+
+    useEffect(() => {
+        async function fetchModels() {
+            try {
+                setLoadingModels(true);
+                setErrorModels(null);
+                const data = await listModels();
+                // data.data => array de {id:'...', object:'model'}
+                setModelList(data.data);
+            } catch (err: any) {
+                setErrorModels(err.message);
+            } finally {
+                setLoadingModels(false);
+            }
+        }
+        fetchModels();
+    }, []);
 
     return (
         <RightPanelContainer>
@@ -164,12 +195,18 @@ const RightPanel: React.FC<RightPanelProps> = ({
 
             <PanelSection>
                 <SectionTitle>Model</SectionTitle>
-                <RoundedSelect>
-                    <option>gpt-4o</option>
-                    <option>gpt-4o-mini</option>
-                    <option>gpt-4o-audio-preview</option>
-                    <option>01-preview-2024-09-12</option>
-                </RoundedSelect>
+                {loadingModels && <div style={{ color: '#aaa' }}>Cargando modelos...</div>}
+                {errorModels && <div style={{ color: 'red' }}>{errorModels}</div>}
+                {!loadingModels && !errorModels && (
+                    <RoundedSelect
+                        value={selectedModel}
+                        onChange={(e) => setSelectedModel(e.target.value)}
+                    >
+                        {modelList.map((m) => (
+                            <option key={m.id} value={m.id}>{m.id}</option>
+                        ))}
+                    </RoundedSelect>
+                )}
             </PanelSection>
 
             <PanelSection>
@@ -183,7 +220,6 @@ const RightPanel: React.FC<RightPanelProps> = ({
 
             <PanelSection>
                 <SectionTitle>Functions</SectionTitle>
-
                 <FunctionsListContainer>
                     {functionsList.length < 1 ? (
                         <i style={{ color: '#ccc', fontSize: '0.9rem' }}>No functions</i>
@@ -209,7 +245,6 @@ const RightPanel: React.FC<RightPanelProps> = ({
 
             <PanelSection>
                 <SectionTitle>Model configuration</SectionTitle>
-
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#bbb', fontSize: '0.85rem' }}>
                     <label>Temperature</label>
                     <span>{tempValue.toFixed(2)}</span>

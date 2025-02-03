@@ -1,3 +1,5 @@
+// src/components/chat/SystemMessagePopup.tsx
+
 import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { FiArrowRight } from 'react-icons/fi';

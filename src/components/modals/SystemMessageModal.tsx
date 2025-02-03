@@ -1,3 +1,5 @@
+// src/components/modals/SystemMessageModal.tsx
+
 import React, { FC } from 'react';
 import {GlobalPopup} from "./GlobalPopup";
 

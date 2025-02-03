@@ -11,78 +11,76 @@ interface Props {
 }
 
 const Overlay = styled.div`
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  background-color: rgba(0,0,0,0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background-color: rgba(0,0,0,0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
 `;
 
 const Container = styled.div`
-  background-color: #2f2f2f;
-  width: 600px;
-  max-width: 90%;
-  max-height: 90vh;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-  display: flex;
-  flex-direction: column;
-  position: relative;
-  padding: 1rem;
+    background-color: #2f2f2f;
+    width: 600px;
+    max-width: 90%;
+    max-height: 90vh;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    padding: 1rem;
 `;
 
 const CloseIcon = styled.div`
-  position: absolute;
-  top: 0.5rem;
-  right: 0.7rem;
-  cursor: pointer;
-  font-size: 1.1rem;
-  color: #ccc;
-  &:hover {
-    color: #fff;
-  }
+    position: absolute;
+    top: 0.5rem;
+    right: 0.7rem;
+    cursor: pointer;
+    font-size: 1.1rem;
+    color: #ccc;
+    &:hover {
+        color: #fff;
+    }
 `;
 
 const Title = styled.h3`
-  margin: 0;
-  color: #fff;
-  margin-bottom: 0.5rem;
+    margin: 0;
+    color: #fff;
+    margin-bottom: 0.5rem;
 `;
 
 const Label = styled.div`
-  font-size: 0.9rem;
-  color: #ccc;
-  margin-top: 0.8rem;
-  margin-bottom: 0.3rem;
-  font-weight: bold;
+    font-size: 0.9rem;
+    color: #ccc;
+    margin-top: 0.8rem;
+    margin-bottom: 0.3rem;
+    font-weight: bold;
 `;
 
 const TextArea = styled.textarea`
-  width: 100%;
-  background-color: #1f1f1f;
-  border: 1px solid #444;
-  border-radius: 4px;
-  color: #eee;
-  padding: 0.75rem;
-  resize: vertical;
-  font-size: 0.9rem;
-  min-height: 120px;
+    width: 100%;
+    background-color: #1f1f1f;
+    border: 1px solid #444;
+    border-radius: 4px;
+    color: #eee;
+    padding: 0.75rem;
+    resize: vertical;
+    font-size: 0.9rem;
+    min-height: 120px;
 `;
 
 const Hint = styled.div`
-  font-size: 0.8rem;
-  color: #666;
-  margin-top: 0.2rem;
+    font-size: 0.8rem;
+    color: #666;
+    margin-top: 0.2rem;
 `;
 
 const FunctionCallEditor: React.FC<Props> = ({ fn, onClose }) => {
-    // Almacena la “definición” (parámetros) y la “respuesta”
     const [functionCall, setFunctionCall] = useState(fn.jsonDefinition);
     const [functionResponse, setFunctionResponse] = useState('');
 
-    // Clic afuera => close
     const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
         if (e.target === e.currentTarget) {
             onClose();
@@ -98,14 +96,12 @@ const FunctionCallEditor: React.FC<Props> = ({ fn, onClose }) => {
 
                 <Title>{fn.name}</Title>
 
-                {/* 1er recuadro: la function con parámetros */}
-                <Label>{fn.name}({`{ ... }`})</Label>
+                <Label>{fn.name}(&#123; ... &#125;)</Label>
                 <TextArea
                     value={functionCall}
                     onChange={(e) => setFunctionCall(e.target.value)}
                 />
 
-                {/* 2do recuadro: la respuesta */}
                 <Label>RESPONSE</Label>
                 <TextArea
                     value={functionResponse}

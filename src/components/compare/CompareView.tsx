@@ -2,14 +2,18 @@
 
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { FiZap, FiArrowUp, FiArrowDown, FiClipboard, FiMoreHorizontal, FiSettings } from 'react-icons/fi';
+import {
+    FiZap, FiArrowUp, FiArrowDown, FiClipboard,
+    FiMoreHorizontal, FiSettings
+} from 'react-icons/fi';
 import { IMessageData } from '../chat/MessageBubble';
 import CompareColumnMenu from './CompareColumnMenu';
 import CompareColumnConfig from './CompareColumnConfig';
 import { IFunctionDef } from '../../pages/PlaygroundPage';
 import CompareViewCodeModal from './CompareViewCodeModal';
 
-/* ----------- Estilos (copiados de tu ejemplo) ----------- */
+// Importamos las llamadas a la API
+import { createChatCompletion, listModels } from '../../services/playgroundApi';
 
 const CompareContainer = styled.div`
     display: flex;
@@ -17,9 +21,10 @@ const CompareContainer = styled.div`
     flex: 1;
     overflow: hidden;
     animation: fadeInCompare 0.4s ease forwards;
+
     @keyframes fadeInCompare {
         from { opacity: 0; transform: translateY(20px); }
-        to { opacity: 1; transform: translateY(0); }
+        to   { opacity: 1; transform: translateY(0); }
     }
 `;
 
@@ -28,6 +33,7 @@ const Column = styled.div`
     display: flex;
     flex-direction: column;
     border-right: 1px solid #333;
+
     &:last-child {
         border-right: none;
     }
@@ -86,6 +92,7 @@ const TimingBar = styled.div`
     padding: 0.5rem 0;
     background-color: #2f2f2f;
     border-top: 1px solid #333;
+
     div {
         display: flex;
         align-items: center;
@@ -115,6 +122,7 @@ const InputBox = styled.textarea`
     min-height: 60px;
     resize: none;
     font-size: 0.9rem;
+
     &:focus {
         border-color: #666;
     }
@@ -132,21 +140,18 @@ const RunButton = styled.button`
     cursor: pointer;
     font-weight: bold;
     transition: background 0.2s ease;
+
     &:hover {
         background-color: #00b88c;
     }
 `;
 
-/* ------------------------------------------------- */
-
 interface CompareProps {
-    // Los 4 props originales
     leftMessages: IMessageData[];
     setLeftMessages: React.Dispatch<React.SetStateAction<IMessageData[]>>;
     rightMessages: IMessageData[];
     setRightMessages: React.Dispatch<React.SetStateAction<IMessageData[]>>;
 
-    // NUEVO: El chat principal, para sincronizar
     mainMessages: IMessageData[];
     setMainMessages: React.Dispatch<React.SetStateAction<IMessageData[]>>;
 }
@@ -154,28 +159,24 @@ interface CompareProps {
 const CompareView: React.FC<CompareProps> = ({
                                                  leftMessages, setLeftMessages,
                                                  rightMessages, setRightMessages,
-
-                                                 // nuevo
                                                  mainMessages, setMainMessages
                                              }) => {
-
-    // Un input para mandar mensajes a la vez a ambos (left, right).
     const [inputVal, setInputVal] = useState('');
 
-    // Menús
-    const [leftMenuAnchor, setLeftMenuAnchor] = useState<DOMRect|null>(null);
-    const [rightMenuAnchor, setRightMenuAnchor] = useState<DOMRect|null>(null);
+    // Menús contextuales
+    const [leftMenuAnchor, setLeftMenuAnchor] = useState<DOMRect | null>(null);
+    const [rightMenuAnchor, setRightMenuAnchor] = useState<DOMRect | null>(null);
 
-    // Config
-    const [leftConfigAnchor, setLeftConfigAnchor] = useState<DOMRect|null>(null);
-    const [rightConfigAnchor, setRightConfigAnchor] = useState<DOMRect|null>(null);
+    // Popups config
+    const [leftConfigAnchor, setLeftConfigAnchor] = useState<DOMRect | null>(null);
+    const [rightConfigAnchor, setRightConfigAnchor] = useState<DOMRect | null>(null);
 
-    // "View code" modals
+    // Modales view code
     const [leftCodeOpen, setLeftCodeOpen] = useState(false);
     const [rightCodeOpen, setRightCodeOpen] = useState(false);
 
-    // Ejemplos de "states" de config para left y right
-    const [leftModel, setLeftModel] = useState('gpt-4o');
+    // Estados de config (columna izquierda)
+    const [leftModel, setLeftModel] = useState('gpt-4');
     const [leftResponseFmt, setLeftResponseFmt] = useState('text');
     const [leftFunctions, setLeftFunctions] = useState<IFunctionDef[]>([]);
     const [leftTemp, setLeftTemp] = useState(1.0);
@@ -184,7 +185,16 @@ const CompareView: React.FC<CompareProps> = ({
     const [leftFreq, setLeftFreq] = useState(0);
     const [leftPres, setLeftPres] = useState(0);
 
-    const [rightModel, setRightModel] = useState('gpt-4o');
+    // Métricas (tiempo, tokens, requestId) col izq
+    const [leftTiming, setLeftTiming] = useState({
+        totalMs: 0,
+        upTokens: 0,
+        downTokens: 0,
+        requestId: ''
+    });
+
+    // Estados de config (columna derecha)
+    const [rightModel, setRightModel] = useState('gpt-4');
     const [rightResponseFmt, setRightResponseFmt] = useState('text');
     const [rightFunctions, setRightFunctions] = useState<IFunctionDef[]>([]);
     const [rightTemp, setRightTemp] = useState(1.0);
@@ -193,71 +203,64 @@ const CompareView: React.FC<CompareProps> = ({
     const [rightFreq, setRightFreq] = useState(0);
     const [rightPres, setRightPres] = useState(0);
 
-    /**
-     * Opcional: Si quieres que cada vez que el chat principal cambie,
-     *           CompareView muestre lo mismo en left y right, usa un useEffect.
-     *           Así, se "sincroniza" automáticamente.
-     */
+    // Métricas col der
+    const [rightTiming, setRightTiming] = useState({
+        totalMs: 0,
+        upTokens: 0,
+        downTokens: 0,
+        requestId: ''
+    });
+
+    // Lista de modelos
+    const [models, setModels] = useState<{ id: string }[]>([]);
+    const [loadingModels, setLoadingModels] = useState(false);
+    const [errorModels, setErrorModels] = useState<string | null>(null);
+
+    // Al montar, cargar la lista de modelos
+    useEffect(() => {
+        async function fetchModels() {
+            try {
+                setLoadingModels(true);
+                setErrorModels(null);
+                const data = await listModels();
+                setModels(data.data); // data.data => array de {id:'...', object:'model'}
+            } catch (err: any) {
+                setErrorModels(err.message);
+            } finally {
+                setLoadingModels(false);
+            }
+        }
+        fetchModels();
+    }, []);
+
+    // Al iniciar, copia la conversación principal a ambos
     useEffect(() => {
         setLeftMessages(mainMessages);
         setRightMessages(mainMessages);
     }, [mainMessages, setLeftMessages, setRightMessages]);
 
-    // Al presionar "Run", agregamos mensajes a left, right y al principal
-    const handleSend = () => {
-        if (!inputVal.trim()) return;
-
-        // Mensaje de user
-        const userMsg: IMessageData = {
-            id: Date.now(),
-            role: 'user',
-            content: inputVal.trim(),
-            originalContent: inputVal.trim()
-        };
-
-        // Mensaje de assistant
-        const asstMsg: IMessageData = {
-            id: Date.now() + 1,
-            role: 'assistant',
-            content: `(Compare) => Respuesta a: "${inputVal.trim()}"`,
-            originalContent: `(Compare) => Respuesta a: "${inputVal.trim()}"`
-        };
-
-        // Agregamos en left
-        setLeftMessages(prev => [...prev, userMsg, asstMsg]);
-        // Agregamos en right
-        setRightMessages(prev => [...prev, userMsg, asstMsg]);
-        // También al chat principal
-        setMainMessages(prev => [...prev, userMsg, asstMsg]);
-
-        // Limpiamos el input
-        setInputVal('');
-    };
-
-    // Manejo de menú left
+    // Menús contextuales (puntos suspensivos)
     const handleLeftMenuClick = (e: React.MouseEvent<SVGElement>) => {
         setLeftMenuAnchor(e.currentTarget.getBoundingClientRect());
     };
-    // Manejo de menú right
     const handleRightMenuClick = (e: React.MouseEvent<SVGElement>) => {
         setRightMenuAnchor(e.currentTarget.getBoundingClientRect());
     };
 
-    // Manejo de config left
+    // Popups config (tuerca)
     const handleLeftConfigClick = (e: React.MouseEvent<SVGElement>) => {
         setLeftConfigAnchor(e.currentTarget.getBoundingClientRect());
     };
-    // Manejo de config right
     const handleRightConfigClick = (e: React.MouseEvent<SVGElement>) => {
         setRightConfigAnchor(e.currentTarget.getBoundingClientRect());
     };
 
-    // Acciones del menú left
+    // Acciones menú contextual
     const doLeftAction = (action: string) => {
         if (action === 'viewCode') {
             setLeftCodeOpen(true);
         } else if (action === 'sync') {
-            // Copiar del right => left
+            // Copia los mensajes de la derecha
             setLeftMessages(rightMessages.map(m => ({ ...m, id: Date.now() + Math.random() })));
         } else if (action === 'clear') {
             setLeftMessages([]);
@@ -271,12 +274,10 @@ const CompareView: React.FC<CompareProps> = ({
         setLeftMenuAnchor(null);
     };
 
-    // Acciones del menú right
     const doRightAction = (action: string) => {
         if (action === 'viewCode') {
             setRightCodeOpen(true);
         } else if (action === 'sync') {
-            // Copiar del left => right
             setRightMessages(leftMessages.map(m => ({ ...m, id: Date.now() + Math.random() })));
         } else if (action === 'clear') {
             setRightMessages([]);
@@ -290,6 +291,117 @@ const CompareView: React.FC<CompareProps> = ({
         setRightMenuAnchor(null);
     };
 
+    // Al dar "Run", mandar el prompt a ambos
+    const handleSend = async () => {
+        if (!inputVal.trim()) return;
+
+        // Mensaje user
+        const userMsg: IMessageData = {
+            id: Date.now(),
+            role: 'user',
+            content: inputVal.trim(),
+            originalContent: inputVal.trim()
+        };
+
+        setLeftMessages(prev => [...prev, userMsg]);
+        setRightMessages(prev => [...prev, userMsg]);
+        setMainMessages(prev => [...prev, userMsg]);
+
+        setInputVal('');
+
+        // Left
+        try {
+            const { data, timeMs } = await createChatCompletion({
+                model: leftModel,
+                messages: [...leftMessages, userMsg].map(m => ({
+                    role: m.role,
+                    content: m.content
+                })),
+                temperature: leftTemp,
+                max_tokens: leftMaxT,
+                top_p: leftTopP,
+                frequency_penalty: leftFreq,
+                presence_penalty: leftPres
+            });
+
+            const leftResponse = data.choices?.[0]?.message?.content || '(sin respuesta)';
+            const leftAsstMsg: IMessageData = {
+                id: Date.now() + 100,
+                role: 'assistant',
+                content: leftResponse,
+                originalContent: leftResponse
+            };
+            setLeftMessages(prev => [...prev, leftAsstMsg]);
+            setMainMessages(prev => [...prev, leftAsstMsg]);
+
+            const promptTokens = data.usage?.prompt_tokens || 0;
+            const completionTokens = data.usage?.completion_tokens || 0;
+            const respId = data.id || '';
+            setLeftTiming({
+                totalMs: timeMs,
+                upTokens: promptTokens,
+                downTokens: completionTokens,
+                requestId: respId
+            });
+        } catch (error: any) {
+            console.error("Error en la columna left:", error);
+            const errMsg: IMessageData = {
+                id: Date.now() + 101,
+                role: 'assistant',
+                content: "Error (left): " + error.message,
+                originalContent: "Error (left): " + error.message
+            };
+            setLeftMessages(prev => [...prev, errMsg]);
+            setMainMessages(prev => [...prev, errMsg]);
+        }
+
+        // Right
+        try {
+            const { data, timeMs } = await createChatCompletion({
+                model: rightModel,
+                messages: [...rightMessages, userMsg].map(m => ({
+                    role: m.role,
+                    content: m.content
+                })),
+                temperature: rightTemp,
+                max_tokens: rightMaxT,
+                top_p: rightTopP,
+                frequency_penalty: rightFreq,
+                presence_penalty: rightPres
+            });
+
+            const rightResponse = data.choices?.[0]?.message?.content || '(sin respuesta)';
+            const rightAsstMsg: IMessageData = {
+                id: Date.now() + 200,
+                role: 'assistant',
+                content: rightResponse,
+                originalContent: rightResponse
+            };
+            setRightMessages(prev => [...prev, rightAsstMsg]);
+            setMainMessages(prev => [...prev, rightAsstMsg]);
+
+            const promptTokens = data.usage?.prompt_tokens || 0;
+            const completionTokens = data.usage?.completion_tokens || 0;
+            const respId = data.id || '';
+            setRightTiming({
+                totalMs: timeMs,
+                upTokens: promptTokens,
+                downTokens: completionTokens,
+                requestId: respId
+            });
+        } catch (error: any) {
+            console.error("Error en la columna right:", error);
+            const errMsg: IMessageData = {
+                id: Date.now() + 201,
+                role: 'assistant',
+                content: "Error (right): " + error.message,
+                originalContent: "Error (right): " + error.message
+            };
+            setRightMessages(prev => [...prev, errMsg]);
+            setMainMessages(prev => [...prev, errMsg]);
+        }
+    };
+
     return (
         <>
             <CompareContainer>
@@ -297,18 +409,27 @@ const CompareView: React.FC<CompareProps> = ({
                 <Column>
                     <TopBar>
                         <RowLeft>
-                            <ModelSelect
-                                value={leftModel}
-                                onChange={e => setLeftModel(e.target.value)}
-                            >
-                                <option>gpt-4o</option>
-                                <option>gpt-4o-mini</option>
-                                <option>01-preview-2024-09-12</option>
-                            </ModelSelect>
+                            {loadingModels && <div style={{ color: '#aaa' }}>Loading...</div>}
+                            {errorModels && <div style={{ color: 'red' }}>{errorModels}</div>}
+                            {!loadingModels && !errorModels && models.length > 0 && (
+                                <ModelSelect
+                                    value={leftModel}
+                                    onChange={e => setLeftModel(e.target.value)}
+                                >
+                                    {models.map((m) => (
+                                        <option key={m.id} value={m.id}>{m.id}</option>
+                                    ))}
+                                </ModelSelect>
+                            )}
+                            {models.length === 0 && !errorModels && !loadingModels && (
+                                <ModelSelect disabled>
+                                    <option>No models</option>
+                                </ModelSelect>
+                            )}
                         </RowLeft>
                         <RowRight>
-                            <FiSettings style={{cursor:'pointer'}} onClick={handleLeftConfigClick} />
-                            <FiMoreHorizontal style={{cursor:'pointer'}} onClick={handleLeftMenuClick} />
+                            <FiSettings style={{ cursor: 'pointer' }} onClick={handleLeftConfigClick} />
+                            <FiMoreHorizontal style={{ cursor: 'pointer' }} onClick={handleLeftMenuClick} />
                         </RowRight>
                     </TopBar>
 
@@ -319,10 +440,18 @@ const CompareView: React.FC<CompareProps> = ({
                     </MessagesArea>
 
                     <TimingBar>
-                        <div><FiZap/> 1,395ms</div>
-                        <div><FiArrowUp/> 504t</div>
-                        <div><FiArrowDown/> 162t</div>
-                        <div><FiClipboard/> Request ID</div>
+                        <div>
+                            <FiZap/> {leftTiming.totalMs}ms
+                        </div>
+                        <div>
+                            <FiArrowUp/> {leftTiming.upTokens}t
+                        </div>
+                        <div>
+                            <FiArrowDown/> {leftTiming.downTokens}t
+                        </div>
+                        <div>
+                            <FiClipboard/> {leftTiming.requestId || '---'}
+                        </div>
                     </TimingBar>
                 </Column>
 
@@ -330,18 +459,27 @@ const CompareView: React.FC<CompareProps> = ({
                 <Column>
                     <TopBar>
                         <RowLeft>
-                            <ModelSelect
-                                value={rightModel}
-                                onChange={e => setRightModel(e.target.value)}
-                            >
-                                <option>gpt-4o</option>
-                                <option>gpt-4o-mini</option>
-                                <option>01-preview-2024-09-12</option>
-                            </ModelSelect>
+                            {loadingModels && <div style={{ color: '#aaa' }}>Loading...</div>}
+                            {errorModels && <div style={{ color: 'red' }}>{errorModels}</div>}
+                            {!loadingModels && !errorModels && models.length > 0 && (
+                                <ModelSelect
+                                    value={rightModel}
+                                    onChange={e => setRightModel(e.target.value)}
+                                >
+                                    {models.map((m) => (
+                                        <option key={m.id} value={m.id}>{m.id}</option>
+                                    ))}
+                                </ModelSelect>
+                            )}
+                            {models.length === 0 && !errorModels && !loadingModels && (
+                                <ModelSelect disabled>
+                                    <option>No models</option>
+                                </ModelSelect>
+                            )}
                         </RowLeft>
                         <RowRight>
-                            <FiSettings style={{cursor:'pointer'}} onClick={handleRightConfigClick} />
-                            <FiMoreHorizontal style={{cursor:'pointer'}} onClick={handleRightMenuClick} />
+                            <FiSettings style={{ cursor: 'pointer' }} onClick={handleRightConfigClick} />
+                            <FiMoreHorizontal style={{ cursor: 'pointer' }} onClick={handleRightMenuClick} />
                         </RowRight>
                     </TopBar>
 
@@ -352,15 +490,22 @@ const CompareView: React.FC<CompareProps> = ({
                     </MessagesArea>
 
                     <TimingBar>
-                        <div><FiZap/> 1,295ms</div>
-                        <div><FiArrowUp/> 501t</div>
-                        <div><FiArrowDown/> 99t</div>
-                        <div><FiClipboard/> Request ID</div>
+                        <div>
+                            <FiZap/> {rightTiming.totalMs}ms
+                        </div>
+                        <div>
+                            <FiArrowUp/> {rightTiming.upTokens}t
+                        </div>
+                        <div>
+                            <FiArrowDown/> {rightTiming.downTokens}t
+                        </div>
+                        <div>
+                            <FiClipboard/> {rightTiming.requestId || '---'}
+                        </div>
                     </TimingBar>
                 </Column>
             </CompareContainer>
 
-            {/* Footer con un único input */}
             <Footer>
                 <InputBox
                     placeholder="Type your message and run in both..."
@@ -370,7 +515,7 @@ const CompareView: React.FC<CompareProps> = ({
                 <RunButton onClick={handleSend}>Run</RunButton>
             </Footer>
 
-            {/* MENUS */}
+            {/* Menú contextual izq */}
             {leftMenuAnchor && (
                 <CompareColumnMenu
                     anchorRect={leftMenuAnchor}
@@ -379,6 +524,7 @@ const CompareView: React.FC<CompareProps> = ({
                     onAction={doLeftAction}
                 />
             )}
+            {/* Menú contextual der */}
             {rightMenuAnchor && (
                 <CompareColumnMenu
                     anchorRect={rightMenuAnchor}
@@ -388,12 +534,15 @@ const CompareView: React.FC<CompareProps> = ({
                 />
             )}
 
-            {/* CONFIGS */}
+            {/* Config popups */}
             {leftConfigAnchor && (
                 <CompareColumnConfig
                     anchorRect={leftConfigAnchor}
                     side="left"
                     onClose={() => setLeftConfigAnchor(null)}
+                    models={models}
+                    loadingModels={loadingModels}
+                    errorModels={errorModels}
 
                     model={leftModel} setModel={setLeftModel}
                     responseFormat={leftResponseFmt} setResponseFormat={setLeftResponseFmt}
@@ -410,6 +559,9 @@ const CompareView: React.FC<CompareProps> = ({
                     anchorRect={rightConfigAnchor}
                     side="right"
                     onClose={() => setRightConfigAnchor(null)}
+                    models={models}
+                    loadingModels={loadingModels}
+                    errorModels={errorModels}
 
                     model={rightModel} setModel={setRightModel}
                     responseFormat={rightResponseFmt} setResponseFormat={setRightResponseFmt}
@@ -422,7 +574,7 @@ const CompareView: React.FC<CompareProps> = ({
                 />
             )}
 
-            {/* CODE modals */}
+            {/* View Code modals */}
             {leftCodeOpen && (
                 <CompareViewCodeModal
                     side="left"

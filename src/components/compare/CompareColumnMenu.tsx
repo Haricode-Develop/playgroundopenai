@@ -34,6 +34,7 @@ const Item = styled.div`
     display: flex;
     align-items: center;
     gap: 0.5rem;
+
     &:hover {
         background: #3a3a3a;
         color: #fff;
@@ -48,17 +49,17 @@ const CompareColumnMenu: React.FC<Props> = ({
                                             }) => {
     const ref = useRef<HTMLDivElement>(null);
 
-    useEffect(()=>{
-        const handleDocClick = (e: MouseEvent)=>{
-            if(ref.current && !ref.current.contains(e.target as Node)){
+    useEffect(() => {
+        const handleDocClick = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) {
                 onClose();
             }
         };
         document.addEventListener('mousedown', handleDocClick);
-        return ()=> {
+        return () => {
             document.removeEventListener('mousedown', handleDocClick);
         };
-    },[onClose]);
+    }, [onClose]);
 
     const top = anchorRect.bottom + 5;
     const left = anchorRect.left;
@@ -68,22 +69,22 @@ const CompareColumnMenu: React.FC<Props> = ({
             ref={ref}
             style={{ top, left }}
         >
-            <Item onClick={()=> onAction('viewCode')}>
-                <FiCode/> View code
+            <Item onClick={() => onAction('viewCode')}>
+                <FiCode /> View code
             </Item>
-            <Item onClick={()=> onAction('sync')}>
-                <FiRefreshCw/> Sync messages
+            <Item onClick={() => onAction('sync')}>
+                <FiRefreshCw /> Sync messages
             </Item>
-            <Item onClick={()=> onAction('clear')}>
-                <FiTrash2/> Clear chat
+            <Item onClick={() => onAction('clear')}>
+                <FiTrash2 /> Clear chat
             </Item>
-            {side==='left' ? (
-                <Item onClick={()=> onAction('moveRight')}>
-                    <FiArrowRight/> Move right
+            {side === 'left' ? (
+                <Item onClick={() => onAction('moveRight')}>
+                    <FiArrowRight /> Move right
                 </Item>
             ) : (
-                <Item onClick={()=> onAction('moveLeft')}>
-                    <FiArrowLeft/> Move left
+                <Item onClick={() => onAction('moveLeft')}>
+                    <FiArrowLeft /> Move left
                 </Item>
             )}
         </MenuContainer>

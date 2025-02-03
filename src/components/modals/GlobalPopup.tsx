@@ -1,3 +1,5 @@
+// src/components/modals/GlobalPopup.tsx
+
 import React, { useState, FC } from 'react';
 import styled from 'styled-components';
 

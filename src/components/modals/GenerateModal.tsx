@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+// src/components/modals/GenerateModal.tsx
+
+import React, { useState, FC } from 'react';
 import styled from 'styled-components';
 
 interface Props {

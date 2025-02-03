@@ -1,6 +1,6 @@
 // src/components/chat/Chat.tsx
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
     ChatContainer,
     MessagesContainer,
@@ -39,18 +39,23 @@ import SystemGeneratePopup from './SystemGeneratePopup';
 import AttachmentsPopup from './AttachmentsPopup';
 import DislikeFeedbackPopup from './DislikeFeedbackPopup';
 import { IFunctionDef } from '../../pages/PlaygroundPage';
+import { createChatCompletion } from '../../services/playgroundApi';
 
-/**
- * Extendemos IMessageData para que un msg de 'assistant' pueda tener
- * functionJson y functionResponse (la edición in-line de la función)
- */
 interface IAssistantFnData {
-    functionJson?: string;       // texto JSON de la función
-    functionResponse?: string;   // texto del response
+    functionJson?: string;      // El JSON con la definición de la función
+    functionResponse?: string;  // Lo que el usuario escribe como respuesta/resultado
 }
+
 type ExtMessageData = IMessageData & IAssistantFnData;
 
 interface ChatProps {
+    model: string;                // Modelo seleccionado (ej: "gpt-3.5-turbo")
+    temperature: number;
+    maxTokens: number;
+    topP: number;
+    freqPenalty: number;
+    presPenalty: number;
+
     functionsList: IFunctionDef[];
     messages: ExtMessageData[];
     setMessages: React.Dispatch<React.SetStateAction<ExtMessageData[]>>;
@@ -58,40 +63,47 @@ interface ChatProps {
 }
 
 const Chat: React.FC<ChatProps> = ({
+                                       model,
+                                       temperature,
+                                       maxTokens,
+                                       topP,
+                                       freqPenalty,
+                                       presPenalty,
                                        functionsList,
                                        messages,
                                        setMessages,
                                        onAddHistory
                                    }) => {
-    // system message
     const [systemMessage, setSystemMessage] = useState('You are a helpful assistant...');
     const [collapsed, setCollapsed] = useState(false);
-
-    // input del usuario
     const [inputValue, setInputValue] = useState('');
 
-    // popups
+    // Popups (attachments, disliked, function selection, system generator)
     const [clipAnchorRect, setClipAnchorRect] = useState<DOMRect | null>(null);
     const [dislikeAnchorRect, setDislikeAnchorRect] = useState<DOMRect | null>(null);
     const [dislikeMsgId, setDislikeMsgId] = useState<number | null>(null);
     const [functionsAnchorRect, setFunctionsAnchorRect] = useState<DOMRect | null>(null);
     const [currentMsgId, setCurrentMsgId] = useState<number | null>(null);
-
-    // popup generate para system message
     const [anchorRectGenerate, setAnchorRectGenerate] = useState<DOMRect | null>(null);
 
-    // Ejemplo de times
-    const timeData = {
-        totalMs: '985ms',
-        upTokens: '692t',
-        downTokens: '31t',
-        requestId: 'Request ID'
-    };
+    // Métricas de tiempo/tokens
+    const [timeData, setTimeData] = useState({
+        totalMs: 0,
+        upTokens: 0,
+        downTokens: 0,
+        requestId: ''
+    });
 
-    // Al presionar "Run"
-    const handleSend = () => {
+    // Ref para el input de archivo (upload image)
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+    /**
+     * handleSend: se llama al pulsar "Run" para mandar un mensaje de usuario
+     * y obtener la respuesta del modelo.
+     */
+    const handleSend = async () => {
         if (inputValue.trim()) {
-            // Mensaje de usuario
+            // Mensaje user
             const userMsg: ExtMessageData = {
                 id: Date.now(),
                 role: 'user',
@@ -101,54 +113,145 @@ const Chat: React.FC<ChatProps> = ({
             setMessages(prev => [...prev, userMsg]);
             onAddHistory(userMsg);
 
-            // Mensaje de assistant (simulado)
-            const assistantMsg: ExtMessageData = {
-                id: Date.now() + 1,
-                role: 'assistant',
-                content: `Assistant response to: "${inputValue.trim()}"`,
-                originalContent: `Assistant response to: "${inputValue.trim()}"`
-            };
-            // Chequeamos si hay algún assistant con function data
-            const hasFn = messages.find(m =>
-                m.role === 'assistant' && m.functionJson && m.functionResponse
-            );
-            if (hasFn) {
-                assistantMsg.content += `\n\n(Using function data: ${hasFn.functionJson}, response: ${hasFn.functionResponse})`;
-                assistantMsg.originalContent = assistantMsg.content;
+            // Llamar a la API
+            try {
+                const { data, timeMs } = await createChatCompletion({
+                    model,
+                    messages: [
+                        { role: "system", content: systemMessage },
+                        { role: "user", content: userMsg.content }
+                    ],
+                    temperature,
+                    max_tokens: maxTokens,
+                    top_p: topP,
+                    frequency_penalty: freqPenalty,
+                    presence_penalty: presPenalty
+                });
+
+                const assistantResponse = data.choices?.[0]?.message?.content || "(sin respuesta)";
+                const assistantMsg: ExtMessageData = {
+                    id: Date.now() + 1,
+                    role: "assistant",
+                    content: assistantResponse,
+                    originalContent: assistantResponse,
+                };
+                setMessages(prev => [...prev, assistantMsg]);
+                onAddHistory(assistantMsg);
+
+                // Métricas
+                const promptTokens = data.usage?.prompt_tokens || 0;
+                const completionTokens = data.usage?.completion_tokens || 0;
+                const respId = data.id || '';
+
+                setTimeData({
+                    totalMs: timeMs,
+                    upTokens: promptTokens,
+                    downTokens: completionTokens,
+                    requestId: respId
+                });
+
+            } catch (error: any) {
+                console.error("Error en createChatCompletion", error);
+                const errorMsg: ExtMessageData = {
+                    id: Date.now() + 2,
+                    role: "assistant",
+                    content: "Error: " + error.message,
+                    originalContent: "Error: " + error.message
+                };
+                setMessages(prev => [...prev, errorMsg]);
+                onAddHistory(errorMsg);
             }
-            setMessages(prev => [...prev, assistantMsg]);
-            onAddHistory(assistantMsg);
 
             setInputValue('');
         } else {
-            // Si no hay texto => tomamos systemMessage
+            // No hay input => mandar systemMessage
             const systemMsg: ExtMessageData = {
                 id: Date.now(),
                 role: 'assistant',
                 content: systemMessage.trim() || '(System empty)',
                 originalContent: systemMessage.trim()
             };
-            const hasFn = messages.find(m =>
-                m.role==='assistant' && m.functionJson && m.functionResponse
-            );
-            if(hasFn) {
-                systemMsg.content += `\n\n(Using function data: ${hasFn.functionJson}, response: ${hasFn.functionResponse})`;
-                systemMsg.originalContent = systemMsg.content;
-            }
             setMessages(prev => [...prev, systemMsg]);
             onAddHistory(systemMsg);
         }
     };
 
-    // Borrar un mensaje
+    /** handleCallFunction: “function” role. */
+    const handleCallFunction = async (msgId: number) => {
+        const msg = messages.find(m => m.id === msgId);
+        if (!msg || !msg.functionJson) return;
+
+        try {
+            const parsed = JSON.parse(msg.functionJson);
+            const fnName = parsed.name || 'unnamed_function';
+            const fnArgs = msg.functionResponse?.trim() || '{}';
+
+            const conversation = [
+                { role: 'system' as const, content: systemMessage },
+                ...messages.map(m => ({
+                    role: m.role as 'function'|'assistant'|'system'|'user',
+                    content: m.originalContent || m.content
+                })),
+                {
+                    role: 'function' as const,
+                    name: fnName,
+                    content: fnArgs
+                }
+            ];
+
+            const { data, timeMs } = await createChatCompletion({
+                model,
+                messages: conversation,
+                temperature,
+                max_tokens: maxTokens,
+                top_p: topP,
+                frequency_penalty: freqPenalty,
+                presence_penalty: presPenalty
+            });
+
+            const newAsstResponse = data.choices[0]?.message?.content || '(no final answer after function)';
+            const newAsstMsg: ExtMessageData = {
+                id: Date.now() + 999,
+                role: 'assistant',
+                content: newAsstResponse,
+                originalContent: newAsstResponse
+            };
+
+            setMessages(prev => [...prev, newAsstMsg]);
+            onAddHistory(newAsstMsg);
+
+            const promptTokens = data.usage?.prompt_tokens || 0;
+            const completionTokens = data.usage?.completion_tokens || 0;
+            const respId = data.id || '';
+
+            setTimeData({
+                totalMs: timeMs,
+                upTokens: promptTokens,
+                downTokens: completionTokens,
+                requestId: respId
+            });
+
+        } catch (err: any) {
+            console.error("Error handleCallFunction:", err);
+            const errorMsg: ExtMessageData = {
+                id: Date.now() + 1000,
+                role: "assistant",
+                content: "Error (function call): " + err.message,
+                originalContent: "Error (function call): " + err.message
+            };
+            setMessages(prev => [...prev, errorMsg]);
+            onAddHistory(errorMsg);
+        }
+    };
+
+    /** Event: user clicks "Delete" en un mensaje. */
     const handleDeleteMessage = (id: number) => {
         setMessages(prev => prev.filter(m => m.id !== id));
     };
 
-    // Dislike => popup
+    /** Toggle Dislike popup. */
     const handleToggleDislike = (id: number, e?: React.MouseEvent<HTMLButtonElement>) => {
         if (!e) {
-            // si no hay evento, togglear normal
             setMessages(prev =>
                 prev.map(m => (m.id === id ? { ...m, isDisliked: !m.isDisliked } : m))
             );
@@ -163,7 +266,7 @@ const Chat: React.FC<ChatProps> = ({
         setDislikeMsgId(null);
     };
 
-    // Convertir a JSON
+    /** Toggle JSON. */
     const handleToggleJSON = (id: number) => {
         setMessages(prev =>
             prev.map(m => {
@@ -171,7 +274,8 @@ const Chat: React.FC<ChatProps> = ({
                     if (!m.isJson) {
                         const j = JSON.stringify(
                             { role: m.role, content: m.originalContent },
-                            null, 2
+                            null,
+                            2
                         );
                         return { ...m, content: j, isJson: true };
                     } else {
@@ -183,7 +287,7 @@ const Chat: React.FC<ChatProps> = ({
         );
     };
 
-    // Popup de Functions
+    /** Función popup: user clica "Open function selection" */
     const handleOpenFunctionsPopup = (msgId: number, e: React.MouseEvent<HTMLButtonElement>) => {
         setCurrentMsgId(msgId);
         const rect = e.currentTarget.getBoundingClientRect();
@@ -194,7 +298,6 @@ const Chat: React.FC<ChatProps> = ({
         setCurrentMsgId(null);
     };
 
-    // Cuando el usuario selecciona una function
     const handleSelectFunction = (fn: IFunctionDef) => {
         if (!currentMsgId) return;
         setMessages(prev => prev.map(m => {
@@ -210,7 +313,7 @@ const Chat: React.FC<ChatProps> = ({
         closeFunctionsPopup();
     };
 
-    // System generate
+    /** System message "Generate" */
     const handleGenerateClick = (e: React.MouseEvent<HTMLButtonElement>) => {
         const rect = e.currentTarget.getBoundingClientRect();
         setAnchorRectGenerate(rect);
@@ -223,14 +326,58 @@ const Chat: React.FC<ChatProps> = ({
         setAnchorRectGenerate(null);
     };
 
-    // Clip
+    /**
+     * Manejo de icono "clip" -> abre AttachmentsPopup
+     */
     const handleClipClick = (e: React.MouseEvent<HTMLButtonElement>) => {
         const rect = e.currentTarget.getBoundingClientRect();
         setClipAnchorRect({ ...rect, top: rect.top - 120 });
     };
     const closeClipPopup = () => setClipAnchorRect(null);
 
-    // Editar la function in-line
+    /**
+     * Link to image -> prompt user for URL -> add as user message
+     */
+    const handleLinkImage = () => {
+        const url = window.prompt("Enter the image URL:");
+        if (!url) return;
+        // Agregamos un mensaje user que dice "User attached image link: X"
+        const newMsg: ExtMessageData = {
+            id: Date.now(),
+            role: 'user',
+            content: `[User attached an image link]: ${url}`,
+            originalContent: `[User attached an image link]: ${url}`
+        };
+        setMessages(prev => [...prev, newMsg]);
+        onAddHistory(newMsg);
+    };
+
+    /**
+     * Upload image -> abrir file input -> al seleccionar, se añade un user message
+     */
+    const handleUploadImage = () => {
+        if (!fileInputRef.current) return;
+        fileInputRef.current.click();
+    };
+
+    /** onChange del input file */
+    const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const newMsg: ExtMessageData = {
+            id: Date.now(),
+            role: 'user',
+            content: `[User uploaded an image]: ${file.name}`,
+            originalContent: `[User uploaded an image]: ${file.name}`
+        };
+        setMessages(prev => [...prev, newMsg]);
+        onAddHistory(newMsg);
+
+        // Limpia el valor del input
+        e.target.value = '';
+    };
+
+    // Para functionJson / functionResponse
     const handleChangeFnJson = (id: number, newText: string) => {
         setMessages(prev => prev.map(m => {
             if (m.id === id) {
@@ -250,7 +397,15 @@ const Chat: React.FC<ChatProps> = ({
 
     return (
         <ChatContainer>
-            {/* System message */}
+            {/* input file hidden */}
+            <input
+                type="file"
+                style={{ display: 'none' }}
+                ref={fileInputRef}
+                onChange={handleFileSelected}
+                accept="image/*"
+            />
+
             <SystemMessageCard $collapsed={collapsed}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                     <SystemMessageHeader>System message</SystemMessageHeader>
@@ -296,7 +451,6 @@ const Chat: React.FC<ChatProps> = ({
                 />
             )}
 
-            {/* Lista de mensajes */}
             <MessagesContainer>
                 {messages.map(msg => (
                     <FadeInMessage key={msg.id}>
@@ -308,7 +462,7 @@ const Chat: React.FC<ChatProps> = ({
                             onOpenFunctionsPopup={handleOpenFunctionsPopup}
                         />
 
-                        {/* Si es assistant y tiene functionJson => mostramos 2 textareas */}
+                        {/* Bloque para Assistant que tenga functionJson */}
                         {msg.role === 'assistant' && msg.functionJson !== undefined && (
                             <div
                                 style={{
@@ -319,7 +473,7 @@ const Chat: React.FC<ChatProps> = ({
                                 }}
                             >
                                 <div style={{ color:'#aaa', fontSize:'0.85rem', marginBottom:'0.3rem' }}>
-                                    Function: (edit parameters)
+                                    Function:
                                 </div>
                                 <textarea
                                     style={{
@@ -349,17 +503,34 @@ const Chat: React.FC<ChatProps> = ({
                                         padding:'0.5rem'
                                     }}
                                     rows={3}
-                                    placeholder='Press tab to generate a response or enter one manually e.g. { "success": true }'
+                                    placeholder='Ej: { "success": true }'
                                     value={msg.functionResponse || ''}
                                     onChange={e => handleChangeFnResp(msg.id, e.target.value)}
                                 />
+
+                                {/* Botón para llamar a la función => handleCallFunction */}
+                                <div style={{marginTop:'0.5rem'}}>
+                                    <button
+                                        style={{
+                                            background:'#00a37a',
+                                            border:'none',
+                                            color:'#fff',
+                                            cursor:'pointer',
+                                            borderRadius:'4px',
+                                            padding:'0.3rem 0.5rem'
+                                        }}
+                                        onClick={()=> handleCallFunction(msg.id)}
+                                    >
+                                        Call function
+                                    </button>
+                                </div>
                             </div>
                         )}
                     </FadeInMessage>
                 ))}
             </MessagesContainer>
 
-            {/* Popup de funciones */}
+            {/* Functions popup (para inyectar functionJson en un msg) */}
             {functionsAnchorRect && currentMsgId && (
                 <FunctionsPopup
                     anchorRect={functionsAnchorRect}
@@ -372,38 +543,29 @@ const Chat: React.FC<ChatProps> = ({
                 />
             )}
 
-            {/* Popup de dislike */}
+            {/* Dislike popup */}
             {dislikeAnchorRect && dislikeMsgId && (
                 <DislikeFeedbackPopup
                     anchorRect={dislikeAnchorRect}
-                    onClose={() => {
-                        setDislikeAnchorRect(null);
-                        setDislikeMsgId(null);
-                    }}
+                    onClose={closeDislikePopup}
                 />
             )}
 
-            {/* Barra de tiempos */}
             <TimingBar>
                 <TimingIconBox>
-                    <FiZap />
-                    {timeData.totalMs}
+                    <FiZap/> {timeData.totalMs}ms
                 </TimingIconBox>
                 <TimingIconBox>
-                    <FiArrowUp />
-                    {timeData.upTokens}
+                    <FiArrowUp/> {timeData.upTokens}t
                 </TimingIconBox>
                 <TimingIconBox>
-                    <FiArrowDown />
-                    {timeData.downTokens}
+                    <FiArrowDown/> {timeData.downTokens}t
                 </TimingIconBox>
                 <TimingIconBox>
-                    <FiClipboard />
-                    {timeData.requestId}
+                    <FiClipboard/> {timeData.requestId || '---'}
                 </TimingIconBox>
             </TimingBar>
 
-            {/* Input */}
             <ChatInputWrapper>
                 <ChatTextArea
                     placeholder="Type your message..."
@@ -419,6 +581,8 @@ const Chat: React.FC<ChatProps> = ({
                             <AttachmentsPopup
                                 anchorRect={clipAnchorRect}
                                 onClose={closeClipPopup}
+                                onLinkImage={handleLinkImage}
+                                onUploadImage={handleUploadImage}
                             />
                         )}
                     </LeftButtonsGroup>

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 
-// Importa tus componentes reales según tu estructura
+// Importa tus componentes
 import Sidebar from '../components/layout/Sidebar';
 import RightPanel from '../components/layout/RightPanel';
 import Header from '../components/layout/Header';
@@ -25,6 +25,8 @@ export interface IFunctionDef {
 }
 
 const PlaygroundPage: React.FC = () => {
+
+    // Modal de “View Code”
     const [isViewCodeOpen, setIsViewCodeOpen] = useState(false);
 
     // Sidebar y compare
@@ -43,36 +45,43 @@ const PlaygroundPage: React.FC = () => {
     const [viewFnModalOpen, setViewFnModalOpen] = useState(false);
     const [fnToView, setFnToView] = useState<IFunctionDef | null>(null);
 
-    // Chat principal (MAIN messages)
+    // Chat principal
     const [chatMessages, setChatMessages] = useState<IMessageData[]>([]);
 
     // Compare
     const [leftMessages, setLeftMessages] = useState<IMessageData[]>([]);
     const [rightMessages, setRightMessages] = useState<IMessageData[]>([]);
 
-    // Config principal
+    // Parámetros globales
     const [tempValue, setTempValue] = useState(1.0);
     const [maxTokens, setMaxTokens] = useState(2048);
     const [topP, setTopP] = useState(1.0);
     const [freqPenalty, setFreqPenalty] = useState(0);
     const [presPenalty, setPresPenalty] = useState(0);
 
+    // Modelo seleccionado (pasado a Chat y RightPanel)
+    const [selectedModel, setSelectedModel] = useState('gpt-3.5-turbo');
+
     // History
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [historyRecords, setHistoryRecords] = useState<any[]>([]);
 
     // Toggle sidebar
-    const handleToggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+    const handleToggleSidebar = () => {
+        setIsSidebarOpen(!isSidebarOpen);
+    };
 
     // Agregar función
     const handleAddFunction = (fn: IFunctionDef) => {
         setFunctionsList(prev => [...prev, fn]);
     };
+
     const handleUpdateFunction = (updated: IFunctionDef) => {
         setFunctionsList(prev =>
             prev.map(f => (f.name === updated.name ? updated : f))
         );
     };
+
     const openEditModal = (fn: IFunctionDef) => {
         setFnToEdit(fn);
         setEditFnModalOpen(true);
@@ -88,7 +97,7 @@ const PlaygroundPage: React.FC = () => {
         setFnToView(null);
     };
 
-    // Limpiar chat
+    // Limpiar chat principal
     const handleClear = () => {
         setChatMessages([]);
     };
@@ -101,7 +110,6 @@ const PlaygroundPage: React.FC = () => {
     // Al togglear el modo compare, copiamos el chat principal a ambos paneles
     const handleToggleCompare = () => {
         if (!isCompareMode) {
-            // Copiar mensajes actuales a ambos paneles
             setLeftMessages(chatMessages);
             setRightMessages(chatMessages);
         }
@@ -110,7 +118,10 @@ const PlaygroundPage: React.FC = () => {
 
     return (
         <PageContainer>
-            <Sidebar isOpen={isSidebarOpen} onToggleSidebar={handleToggleSidebar} />
+            <Sidebar
+                isOpen={isSidebarOpen}
+                onToggleSidebar={handleToggleSidebar}
+            />
 
             {/* Botón flotante si el sidebar está cerrado */}
             {!isSidebarOpen && (
@@ -129,20 +140,24 @@ const PlaygroundPage: React.FC = () => {
 
                 {!isCompareMode ? (
                     <Chat
+                        model={selectedModel}
+                        temperature={tempValue}
+                        maxTokens={maxTokens}
+                        topP={topP}
+                        freqPenalty={freqPenalty}
+                        presPenalty={presPenalty}
+
                         functionsList={functionsList}
                         messages={chatMessages}
                         setMessages={setChatMessages}
                         onAddHistory={(m) => setHistoryRecords(prev => [...prev, m])}
                     />
                 ) : (
-                    // AQUI le pasamos TODO a CompareView, incluyendo el chat principal (mainMessages)
                     <CompareView
                         leftMessages={leftMessages}
                         setLeftMessages={setLeftMessages}
                         rightMessages={rightMessages}
                         setRightMessages={setRightMessages}
-
-                        // Props para sincronizar el chat principal
                         mainMessages={chatMessages}
                         setMainMessages={setChatMessages}
                     />
@@ -156,18 +171,22 @@ const PlaygroundPage: React.FC = () => {
                     onOpenAddFunctionModal={() => setIsAddFunctionOpen(true)}
                     functionsList={functionsList}
                     onOpenViewFunction={openEditModal}
+
                     tempValue={tempValue} setTempValue={setTempValue}
                     maxTokens={maxTokens} setMaxTokens={setMaxTokens}
                     topP={topP} setTopP={setTopP}
                     freqPenalty={freqPenalty} setFreqPenalty={setFreqPenalty}
                     presPenalty={presPenalty} setPresPenalty={setPresPenalty}
+
+                    selectedModel={selectedModel}
+                    setSelectedModel={setSelectedModel}
                 />
             )}
 
             {/* History panel */}
             {isHistoryOpen && (
                 <HistoryPanel
-                    historyRecords={historyRecords.map((h,i)=>({
+                    historyRecords={historyRecords.map((h,i) => ({
                         id: i,
                         role: h.role,
                         content: h.content,

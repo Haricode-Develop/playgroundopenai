@@ -1,12 +1,14 @@
 // src/components/modals/GenerateDefinitionPopup.tsx
+
 import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
+import { createChatCompletion } from '../../services/playgroundApi';
 
 interface Props {
     anchorRect: DOMRect | null;
     currentDefinition: string;
     onClose: () => void;
-    onSubmit: (prompt: string) => void;
+    onSubmit: (newDefinition: string) => void;
 }
 
 const PopupContainer = styled.div<{ anchorRect: DOMRect | null }>`
@@ -79,29 +81,71 @@ const GenerateDefinitionPopup: React.FC<Props> = ({
                                                       onSubmit
                                                   }) => {
     const [prompt, setPrompt] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
     useEffect(() => {
-        if (!anchorRect) onClose();
+        if (!anchorRect) {
+            onClose();
+        }
     }, [anchorRect, onClose]);
 
-    const handleCreateOrUpdate = () => {
-        onSubmit(prompt);
-    };
-
     const hasValue = currentDefinition.trim() !== '';
+
+    async function handleCreateOrUpdate() {
+        if (!prompt.trim()) {
+            return;
+        }
+        setLoading(true);
+        setErrorMsg(null);
+
+        try {
+            // Llamada a la API con el prompt del usuario, para generar un function definition
+            // Por ejemplo, decimos "act as a function definition generator"...
+            const { data } = await createChatCompletion({
+                model: 'gpt-3.5-turbo', // Ajusta el modelo
+                messages: [
+                    { role: 'system', content: 'Actúa como generador de definiciones JSON de funciones' },
+                    { role: 'user', content: `Crea una definición JSON para: ${prompt}` }
+                ],
+                temperature: 0.7,
+                max_tokens: 200
+            });
+
+            const generatedJson = data.choices[0]?.message?.content || '(no definition)';
+
+            // Llamamos a onSubmit con el JSON devuelto
+            onSubmit(generatedJson);
+
+            onClose();
+        } catch (err: any) {
+            setErrorMsg(err.message || String(err));
+        } finally {
+            setLoading(false);
+        }
+    }
 
     return (
         <PopupContainer anchorRect={anchorRect}>
             <Title>Describe what your function does (or paste your code).</Title>
             <Info>We'll generate a definition.</Info>
+
+            {errorMsg && (
+                <div style={{ color: 'red', marginBottom: '0.5rem', fontSize: '0.85rem' }}>
+                    Error: {errorMsg}
+                </div>
+            )}
+
             <PromptArea
                 placeholder="Enter your prompt..."
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
+                disabled={loading}
             />
+
             <ButtonRow>
-                <Button onClick={onClose}>Cancel</Button>
-                <Button $primary onClick={handleCreateOrUpdate}>
+                <Button onClick={onClose} disabled={loading}>Cancel</Button>
+                <Button $primary onClick={handleCreateOrUpdate} disabled={loading}>
                     {hasValue ? 'Update' : 'Create'}
                 </Button>
             </ButtonRow>
